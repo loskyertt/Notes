@@ -193,7 +193,7 @@ nix-shell -p neofetch --run neofetch
 
 ```shell
 # /etc/nixos/packages.nix
-{ pkgs, ... }: # 声明它需要用到 pkgs
+{ config, lib, pkgs, ... }: 
 
 {
   environment.systemPackages = with pkgs; [
@@ -284,7 +284,7 @@ nix-shell -p neofetch --run neofetch
 
 ```shell
 # -------------- docker 配置 --------------
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }: 
 
 {
   # 启用 Docker 守护进程
@@ -530,7 +530,7 @@ sudo nixos-rebuild switch
 
 然后执行 `nix develop`：
 
-![img](imgs/WSL2_NixOS/01flake配置示例.png)
+![img](01_flake配置示例.png)
 
 在原来的系统环境中是没有 C++ 工具链的。
 
