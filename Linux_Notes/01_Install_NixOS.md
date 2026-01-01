@@ -34,7 +34,7 @@ nmcli
 nmcli device wifi list
 ```
 
-![img](imgs/Install_NixOS/01_连接WIFI.png)
+![img](imgs/01_Install_NixOS/01_连接WIFI.png)
 
 主要是为了获得 `SSID`。
 
@@ -239,6 +239,7 @@ nixos-generate-config --root /mnt
   # services.libinput.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
+  # TODO change sky to your username
   users.users.sky = {
     isNormalUser = true;
     extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
@@ -249,18 +250,23 @@ nixos-generate-config --root /mnt
 
   # programs.firefox.enable = true;
 
+  # allow user to install unfree software
+  nixpkgs.config.allowUnfree = true;
+
   # List packages installed in system profile.
   # You can use https://search.nixos.org/ to find more packages (and options).
   environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    vim
     wget
     clash-verge-rev
   ];
 
-  nix.settings.substituters = [ "https://mirror.sjtu.edu.cn/nix-channels/store" ];
+  # set mirrorlist
+  nix.settings.substituters = [
+    "https://mirror.sjtu.edu.cn/nix-channels/store"
+  ];
 
   # List services that you want to enable:
-
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
@@ -270,9 +276,18 @@ nixos-generate-config --root /mnt
 
 这里不对每段配置进行说明，因为每段配置前均有注释。其它配置可以参考 [NixOS 中文：双系统安装](https://nixos-cn.org/tutorials/installation/DualBoot.html)。
 
->> 第一次安装时，不建议修改太多的配置，简单修改下即可（先生成一个最简单的 `generation`），后续进了桌面环境再修改。`hardware-configuration.nix` 基本上不需要改动，除非你明确知道自己在做什么。
+>> 第一次安装时，不建议修改太多的配置，简单修改下即可（先生成一个最简单的 generation，建议不要删除 `generation 1`），后续进了桌面环境再修改。`hardware-configuration.nix` 基本上不需要改动，除非你明确知道自己在做什么！
 
 ## 2.7 安装
+
+添加 channel 镜像：
+
+```bash
+nix-channel --add https://mirrors.cernet.edu.cn/nix-channels/nixos-25.05 nixos
+nix-channel --update
+```
+
+>> 版本可以自己指定，想要“激进”的软件包，就把 `nixos-25.05` 改成 `nixos-unstable`。
 
 执行下面这条命令进行安装（通过镜像源）：
 
@@ -284,9 +299,9 @@ nixos-install --option substituters https://mirror.sjtu.edu.cn/nix-channels/stor
 
 ---
 
-# 3.安装好后的配置
+# 3.基础配置
 
-建议
+建议采用 [模块化系统配置](https://nixos-and-flakes.thiscute.world/zh/nixos-with-flakes/modularize-the-configuration)。
 
 ## 3.1 初始化用户密码
 
@@ -297,6 +312,15 @@ passwd sky
 ```
 
 根据提示设置密码即可。
+
+允许使用非自由软件：
+
+```bash
+{
+  # 允许使用非自由软件
+  nixpkgs.config.allowUnfree = true;
+}
+```
 
 ## 3.2 将系统语言设置为中文
 
@@ -313,10 +337,12 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 { config, lib, pkgs, ... }: 
 
 {
+  # 系统软件包
   environment.systemPackages = [
     pkgs.vim
     pkgs.git
     pkgs.wget
+    pkgs.bat
     pkgs.fastfetch
     pkgs.zsh
     pkgs.htop
@@ -338,6 +364,21 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 }
 ```
 
+`gnome_pkgs.nix`：
+
+```bash
+# /etc/nixos/gnome_pkgs.nix
+{ config, lib, pkgs, ... }: 
+
+{
+  # gnome 软件包
+  environment.systemPackages = [
+    pkgs.gnome-extension-manager
+    pkgs.gnome-tweaks
+  ];
+}
+```
+
 ## 3.3 输入法设置
 
 创建 `input.nix`，然后导入进 `configuration.nix`，内容如下：
@@ -353,6 +394,7 @@ i18n.defaultLocale = "zh_CN.UTF-8";
     QT_IM_MODULE = "fcitx";
     XMODIFIERS = "@im=fcitx";
   };
+  
   i18n.inputMethod = {
     enable = true;
     type = "fcitx5";
@@ -367,3 +409,71 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 ```
 
 可以参考 [Fcitx5 配置](https://nixos.wiki/wiki/Fcitx5)。
+
+---
+
+# 4.常用配置
+
+## 4.1 zsh 配置
+
+创建 `/etc/nixos/shell.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
+
+```shell
+# /etc/nixos/shell.nix
+{ config, lib, pkgs, ... }:
+
+{
+  programs.zsh = {
+    enable = true;
+    # 启用自动建议
+    autosuggestions.enable = true;
+    # 启用语法高亮
+    syntaxHighlighting.enable = true;
+    
+    # 如果你想添加其他更复杂的插件
+    # ohMyZsh = {
+    #   enable = true;
+    #   plugins = [ "git" "sudo" "docker" ];
+    #   theme = "robbyrussell"; # 虽然可以用 starship，但 OMZ 的插件依然好用
+    # };
+  };
+  
+  # 字体配置
+  fonts.packages = with pkgs; [
+    # 在 NixOS 24.05 及之后版本，建议这样写：
+    nerd-fonts.fira-code
+    nerd-fonts.jetbrains-mono
+  ];
+  
+  # 设置默认 Shell (针对你的用户)
+  # 这里用户名是 nixos
+  users.users.nixos.shell = pkgs.zsh;
+}
+```
+
+## 4.2 docker 配置
+
+创建 `/etc/nixos/docker.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
+
+```shell
+# /etc/nixos/docker.nix
+{ config, lib, pkgs, ... }: 
+
+{
+  # 启用 Docker 守护进程
+  virtualisation.docker.enable = true;
+
+  # 将你的用户（我这里是 sky）加入 docker 组
+  users.users.sky.extraGroups = [ "docker" ];
+}
+```
+
+记得要要下载 docker，可以去官方仓库查看 docker 的版本，选择需要的版本下载。
+
+---
+
+# 4.其它配置
+
+后续的配置就跟据个人具体情况而定了。可以参考这个仓库终端配置 [my_nixos](https://github.com/loskyertt/my_nixos)。
+
+---
