@@ -211,6 +211,16 @@ nixos-generate-config --root /mnt
   # Configure network connections interactively with nmcli or nmtui.
   networking.networkmanager.enable = true;
 
+  # set clash-verge-rev and enble TUN mode
+  programs.clash-verge = {
+    enable = true;
+    package = pkgs.clash-verge-rev;
+    serviceMode = true;
+    tunMode = true;
+  };
+  # enable the systemd DNS resolver daemon
+  services.resolved.enable = true;
+
   # Set your time zone.
   time.timeZone = "Asia/Shanghai";
 
@@ -256,7 +266,6 @@ nixos-generate-config --root /mnt
   environment.systemPackages = with pkgs; [
     vim
     wget
-    clash-verge-rev
   ];
 
   # set mirrorlist
@@ -347,8 +356,6 @@ i18n.defaultLocale = "zh_CN.UTF-8";
     pkgs.fastfetch
     pkgs.zsh
     pkgs.btop
-    pkgs.lshw
-    pkgs.clash-verge-rev
     pkgs.google-chrome
   ];
   
@@ -464,7 +471,7 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 
 如果要让 Nvidia GPU 直通进 docker 容器，还需要添加设置：
 
-```bash
+```shell
 {
   hardware.nvidia-container-toolkit.enable = true;
   # Regular Docker
@@ -479,6 +486,31 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 ```bash
 docker run --rm -it --device=nvidia.com/gpu=all ubuntu:latest nvidia-smi
 ```
+
+---
+
+## 4.3 Clash-Verge-Rev TUN 配置
+
+创建 `/etc/nixos/proxy.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
+
+```bash
+# /etc/nixos/proxy.nix
+{ config, lib, pkgs, ... }:
+
+{
+  programs.clash-verge = {
+    enable = true;
+    package = pkgs.clash-verge-rev;  # 下载 clah-verge-rev
+    serviceMode = true;
+    tunMode = true;
+  };
+
+  # 启用 systemd DNS 解析器守护程序 systemd-resolved
+  services.resolved.enable = true;
+}
+```
+
+如果启用了 `systemd-resolved`（或其他任何 DNS 解析器），但仍然无法使用 TUN，则可能是启用了默认的 NixOS 防火墙。完全关闭防火墙（设置 `networking.firewall.enable = false;`）可能不是个好主意，所以请尝试 `networking.firewall.checkReversePath = "loose";`。
 
 ---
 
