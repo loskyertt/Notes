@@ -183,10 +183,6 @@ nixos-generate-config --root /mnt
 可以参考如下配置进行修改（`configuration.nix`）：
 
 ```bash
-# Edit this configuration file to define what should be installed on
-# your system. Help is available in the configuration.nix(5) man page, on
-# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
-
 { config, lib, pkgs, ... }:
 
 {
@@ -224,6 +220,8 @@ nixos-generate-config --root /mnt
     xserver.enable = true;
     displayManager.gdm.enable = true;
     desktopManager.gnome.enable = true;
+    # 设为 false，不使用 gnome 的应用程序
+    # gnome.core-apps.enable = false;
   };
 
   # Enable sound.
@@ -274,7 +272,10 @@ nixos-generate-config --root /mnt
 }
 ```
 
-这里不对每段配置进行说明，因为每段配置前均有注释。其它配置可以参考 [NixOS 中文：双系统安装](https://nixos-cn.org/tutorials/installation/DualBoot.html)。
+这里不对每段配置进行说明，因为每段配置前均有注释。其它配置可以参考：
+- [NixOS 中文：双系统安装](https://nixos-cn.org/tutorials/installation/DualBoot.html)
+
+- [配置选项查询](https://search.nixos.org/options)
 
 >> 第一次安装时，不建议修改太多的配置，简单修改下即可（先生成一个最简单的 generation，建议不要删除 `generation 1`），后续进了桌面环境再修改。`hardware-configuration.nix` 基本上不需要改动，除非你明确知道自己在做什么！
 
@@ -345,7 +346,8 @@ i18n.defaultLocale = "zh_CN.UTF-8";
     pkgs.bat
     pkgs.fastfetch
     pkgs.zsh
-    pkgs.htop
+    pkgs.btop
+    pkgs.lshw
     pkgs.clash-verge-rev
     pkgs.google-chrome
   ];
@@ -354,6 +356,7 @@ i18n.defaultLocale = "zh_CN.UTF-8";
   fonts.packages = with pkgs; [
     # noto-fonts-cjk-sans        # 思源黑体，覆盖所有 CJK 字符
     # noto-fonts-cjk-serif       # 宋体
+    noto-fonts-emoji
     # Maple Mono (Ligature TTF unhinted)
     maple-mono.truetype
     # Maple Mono NF (Ligature unhinted)
@@ -423,31 +426,16 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 { config, lib, pkgs, ... }:
 
 {
+  # 设置默认 Shell (用户名是 nixos)
+  users.users.nixos.shell = pkgs.zsh;
+  
   programs.zsh = {
     enable = true;
     # 启用自动建议
     autosuggestions.enable = true;
     # 启用语法高亮
     syntaxHighlighting.enable = true;
-    
-    # 如果你想添加其他更复杂的插件
-    # ohMyZsh = {
-    #   enable = true;
-    #   plugins = [ "git" "sudo" "docker" ];
-    #   theme = "robbyrussell"; # 虽然可以用 starship，但 OMZ 的插件依然好用
-    # };
   };
-  
-  # 字体配置
-  fonts.packages = with pkgs; [
-    # 在 NixOS 24.05 及之后版本，建议这样写：
-    nerd-fonts.fira-code
-    nerd-fonts.jetbrains-mono
-  ];
-  
-  # 设置默认 Shell (针对你的用户)
-  # 这里用户名是 nixos
-  users.users.nixos.shell = pkgs.zsh;
 }
 ```
 
@@ -460,9 +448,13 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 { config, lib, pkgs, ... }: 
 
 {
-  # 启用 Docker 守护进程
-  virtualisation.docker.enable = true;
-
+  virtualisation.docker = {
+    # 启用 Docker 守护进程
+    enable = true;
+    # 具体版本名取决于你当前的 nixpkgs 仓库中包含哪些定义,你可以改为你需要的版本
+    package = pkgs.docker_28;
+  };
+  
   # 将你的用户（我这里是 sky）加入 docker 组
   users.users.sky.extraGroups = [ "docker" ];
 }
@@ -470,9 +462,236 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 
 记得要要下载 docker，可以去官方仓库查看 docker 的版本，选择需要的版本下载。
 
+如果要让 Nvidia GPU 直通进 docker 容器，还需要添加设置：
+
+```bash
+{
+  hardware.nvidia-container-toolkit.enable = true;
+  # Regular Docker
+  virtualisation.docker.daemon.settings.features.cdi = true;
+  # If using Rootless Docker
+  # virtualisation.docker.rootless.daemon.settings.features.cdi = true;
+}
+```
+
+然后，在使用 docker-cli 时，您应该能够执行以下操作：
+
+```bash
+docker run --rm -it --device=nvidia.com/gpu=all ubuntu:latest nvidia-smi
+```
+
 ---
 
-# 4.其它配置
+# 5.Nvidia 配置
+
+## 5.1 安装 Nvidia 驱动程序
+
+创建 `/etc/nixos/gpu_modules/default.nix` ：
+
+```bash
+# /etc/nixos/gpu_modules/default.nix
+let
+  mode = "offload";   # 想切 sync 就改成 "sync"
+in
+{
+  imports = [
+    ./nvidia.nix
+    ./${mode}_mode.nix
+  ];
+}
+
+# 单显卡只用保留：
+# {
+#   imports = [
+#     ./nvidia.nix
+#   ];
+#  }
+```
+
+在 `/etc/nixos/configuration.nix` 中这样导入：
+
+```shell
+{
+  imports = [
+    ./hardware-configuration.nix
+    ./gpu_modules
+    ...
+  ];
+}
+```
+
+创建 `/etc/nixos/gpu_modules/nvidia.nix`，在里面添加下面内容：
+
+```shell
+# /etc/nixos/gpu_modules/nvidia.nix
+{ config, lib, pkgs, ... }:
+
+{
+  # Enable OpenGL
+  hardware.graphics = {
+    enable = true;
+  };
+
+  # Load nvidia driver for Xorg and Wayland（若是单显卡，就取消注释）
+  # services.xserver.videoDrivers = [ "nvidia" ];
+
+  hardware.nvidia = {
+
+    # Modesetting is required.
+    modesetting.enable = true;
+
+    # 默认（false）情况下，系统休眠时只保存必要的 GPU 状态。
+    # 开启后，它会将全部显存内容保存到磁盘。
+    # 建议: 如果你休眠唤醒后发现桌面花屏、软件崩溃，请将其设为 true。
+    powerManagement.enable = false;
+
+    # true: 细粒度的电源管理，不使用时关闭 GPU。
+    # 仅支持 Turing 架构 (RTX 20) 及之后的笔记本电脑。
+    powerManagement.finegrained = false;
+
+    # false (默认): 使用 Nvidia 的闭源内核模块。这是最稳定的选择，支持所有显卡。
+    # true: 使用 Nvidia 官方近两年发布的开源内核模块，与 Linux 内核集成更好。仅支持 Turing (RTX 20) 架构及之后的新卡。
+    open = false;
+
+    # Enable the Nvidia settings menu
+    nvidiaSettings = true;
+
+    # 根据需要，你可能需要为你的特定显卡选择合适的驱动程序版本。
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+  };
+}
+```
+
+>> 这是单显卡的配置，下面是双显卡（核显 + 独显）的配置方法。
+
+## 5.2 双显卡配置
+
+### 5.2.1 获取显卡总线 ID
+
+执行 `nix-shell -p lshw` 或者 `nix-shell -p toybox` 获取相关软件包。可以通过下面指令来获取：
+
+```bash
+sudo lshw -c display
+
+# 或者
+lspci | grep -i vga
+```
+
+>> **注意**：获取的总线 ID（`bus info`）是十六进制的，需转成十进制：
+
+```bash
+# lshw 获取的输出
+...
+bus info: pci@0000:0e:00.0
+...
+configuration: depth=32 driver=nvidia ...
+...
+```
+
+这表示 Nvidia 总线 ID 为 `0e:00.0`，转成十进制为 `14:0:0`。
+
+```bash
+{
+  hardware.nvidia.prime = {
+    # Make sure to use the correct Bus ID values for your system!
+    intelBusId = "PCI:0:2:0";
+    nvidiaBusId = "PCI:14:0:0";
+    # amdgpuBusId = "PCI:54:0:0"; For AMD GPU
+  };
+}
+```
+
+>> 有 Offload Mode 和 Sync Mode，**这两种模式互斥**，不能同时启用。
+
+### 5.2.2 Offload 模式（推荐）
+
+- **节能优先**：默认使用集成显卡（Intel/AMD iGPU）处理所有显示任务（如桌面、浏览器等），NVIDIA dGPU 保持休眠。
+- **按需使用独显**：仅当你显式加载某个程序到 NVIDIA GPU 时（如游戏、渲染软件），才激活 dGPU。
+- 适用于大多数日常使用场景，兼顾续航与性能。
+
+```bash
+# /etc/nixos/gpu_modules/offload_mode.nix
+{ config, lib, pkgs, ... }:
+
+{
+  # 如果是 amd 核显，就把 modesetting 改为 amdgpu
+  # 注意：顺序不能换，必须是核显在前，独显在后
+  services.xserver.videoDrivers = [ "modesetting" "nvidia" ];
+
+  # Offload 模式
+  hardware.nvidia.prime = {
+    offload = {
+      enable = true;
+      enableOffloadCmd = true;  # 自动生成 nvidia-offload 命令
+    };
+    # Make sure to use the correct Bus ID values for your system!
+    intelBusId = "PCI:0:2:0";
+    nvidiaBusId = "PCI:14:0:0";
+    # amdgpuBusId = "PCI:54:0:0"; For AMD GPU
+  };
+}
+```
+
+日常用法：
+
+- 通过终端启动：
+
+```bash
+nvidia-offload glxgears
+
+nvidia-offload steam
+
+nvidia-offload blender
+```
+
+- Steam 游戏：在 Steam → Settings → Set Launch Options 里给“全局”或逐条游戏写 `nvidia-offload %command%`。
+
+- 查看是否成功 offload：`nvidia-smi` 里只能看到你要跑的进程，其余时间为空。
+
+### 5.2.3 Sync 模式
+
+- **显示输出由 dGPU 渲染并同步到 iGPU 屏幕**，减少画面撕裂（tearing）。
+- **性能优先**：即使没有运行图形密集型程序，NVIDIA GPU 也可能保持活跃（功耗更高）。
+- 适合外接显示器、使用 clamshell 模式（合盖用外显）或对画面流畅性要求高的场景。
+
+```bash
+# /etc/nixos/gpu_modules/sync_mode.nix
+{ config, lib, pkgs, ... }:
+
+{
+  # 如果是 amd 核显，就把 modesetting 改为 amdgpu
+  # 注意：顺序不能换，必须是核显在前，独显在后
+  services.xserver.videoDrivers = [ "modesetting" "nvidia" ];
+
+  # Sync 模式
+  hardware.nvidia.prime = {
+    sync.enable = true;
+
+    # Make sure to use the correct Bus ID values for your system!
+    nvidiaBusId = "PCI:14:0:0";
+    intelBusId = "PCI:0:2:0";
+    # amdgpuBusId = "PCI:54:0:0"; For AMD GPU
+  };
+}
+```
+
+日常用法：
+
+- 什么都不用管，所有程序默认走 Nvidia。
+
+- `nvidia-smi` 里随时都能看到 Xorg 和正在跑的程序。
+
+- 如果想临时让某个程序回核显，目前做不到（除非改配置切回 offload）。
+
+## 5.3 参考文章
+
+- [Nvidia - NixOS Wiki](https://nixos.wiki/wiki/Nvidia)
+
+- [NVIDIA - NixOS 官方 Wiki](https://wiki.nixos.org/wiki/NVIDIA)
+
+---
+
+# 6.其它配置
 
 后续的配置就跟据个人具体情况而定了。可以参考这个仓库终端配置 [my_nixos](https://github.com/loskyertt/my_nixos)。
 
