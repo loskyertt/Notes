@@ -186,22 +186,26 @@ nixos-generate-config --root /mnt
 { config, lib, pkgs, ... }:
 
 {
+  # 这里导入其它配置文件
   imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
+    [
+      ./hardware-configuration.nix  # 硬件配置
     ];
 
   # 禁用 systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = false;
 
   # 启用 GRUB + EFI 模式
-  boot.loader.grub = {
-    enable = true;
-    efiSupport = true;          # 生成 grubx64.efi
-    device = "nodev";           # EFI 模式不需要指定 MBR 设备
+  boot.loader = {
+    # 确保主板能自动识别 NixOS 启动项
+    efi.canTouchEfiVariables = true; 
+  
+    grub = {
+      enable = true;
+      efiSupport = true;  # 生成 grubx64.efi
+      device = "nodev"; # EFI 模式下保持 nodev 是对的
+    };
   };
-
-  boot.loader.efi.canTouchEfiVariables = true;
 
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -354,7 +358,7 @@ i18n.defaultLocale = "zh_CN.UTF-8";
     pkgs.wget
     pkgs.bat
     pkgs.fastfetch
-    pkgs.zsh
+    pkgs.starship
     pkgs.btop
     pkgs.google-chrome
   ];
@@ -486,31 +490,6 @@ i18n.defaultLocale = "zh_CN.UTF-8";
 ```bash
 docker run --rm -it --device=nvidia.com/gpu=all ubuntu:latest nvidia-smi
 ```
-
----
-
-## 4.3 Clash-Verge-Rev TUN 配置
-
-创建 `/etc/nixos/proxy.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
-
-```bash
-# /etc/nixos/proxy.nix
-{ config, lib, pkgs, ... }:
-
-{
-  programs.clash-verge = {
-    enable = true;
-    package = pkgs.clash-verge-rev;  # 下载 clah-verge-rev
-    serviceMode = true;
-    tunMode = true;
-  };
-
-  # 启用 systemd DNS 解析器守护程序 systemd-resolved
-  services.resolved.enable = true;
-}
-```
-
-如果启用了 `systemd-resolved`（或其他任何 DNS 解析器），但仍然无法使用 TUN，则可能是启用了默认的 NixOS 防火墙。完全关闭防火墙（设置 `networking.firewall.enable = false;`）可能不是个好主意，所以请尝试 `networking.firewall.checkReversePath = "loose";`。
 
 ---
 
@@ -720,6 +699,108 @@ nvidia-offload blender
 - [Nvidia - NixOS Wiki](https://nixos.wiki/wiki/Nvidia)
 
 - [NVIDIA - NixOS 官方 Wiki](https://wiki.nixos.org/wiki/NVIDIA)
+
+---
+
+# 6.代理配置
+
+>> 建议使用 TUN 模式，下面都是 TUN 模式的配置。各种配置方式任选一种即可！
+
+## 6.1 mihomo 配置（推荐）
+
+创建 `/etc/nixos/mihomo.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
+
+```bash
+# /etc/nixos/proxy/mihomo.nix
+{ config, lib, pkgs, ... }:
+
+{
+  services.mihomo = {
+    enable = true;
+    package = pkgs.mihomo;
+    tunMode = true;
+    webui = pkgs.metacubexd;
+
+    # 指定你的配置文件路径
+    configFile = ./config.yaml;
+  };
+
+  # 内核转发。默认是开启的，可以用 sysctl net.ipv4.ip_forward 查看
+  # 若未开启，则手动开启
+  # boot.kernel.sysctl = {
+  #   "net.ipv4.ip_forward" = 1;
+  #   # "net.ipv6.conf.all.forwarding" = 1;
+  # };
+}
+```
+
+### 6.1.1 故障排除
+
+可以用 `ip a` 检查是否有 TUN 网卡和用 `sudo journalctl -fu mihomo` 查看日志。
+
+若日志中有 `bind: permission denied`，则启用下面选项：
+
+```bash
+{
+  # 允许服务绑定 53 端口
+  systemd.services.mihomo.serviceConfig.AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" "CAP_NET_ADMIN" ];
+  systemd.services.mihomo.serviceConfig.CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" "CAP_NET_ADMIN" ];
+}
+```
+
+仍然无法使用 TUN，可以使用 `sudo dmesg` 检查内核日志。如果看到大量关于特定网络设备的 refuse 消息，那么可能是防火墙的原因，可以先关闭试试:
+
+```bash
+{
+  networking.firewall.enable = false;
+}
+```
+
+如果关掉防火墙后问题得到解决，可以依次尝试：
+
+- 将 tun 设备添加到 `trustedInterfaces`
+- 禁用 `checkReversePath`
+
+```bash
+{
+  # 若确实是防火墙的原因，则用下面这段配置
+  networking.firewall = {
+    enable = true;
+    # 填入 tun 接口名字（通过 ip a 确认）
+    trustedInterfaces = [ "Meta" ];
+    checkReversePath = "loose";
+  };
+}
+```
+
+>> 当然，最关键的还得是你 `config.yaml` 中的配置，是否其中有问题？
+
+参考文章：
+
+- [NixOS mihomo Wiki](https://wiki.nixos.org/wiki/Mihomo/zh)。
+
+## 6.2 Clash-Verge-Rev 配置
+
+创建 `/etc/nixos/clash-verge.nix`，在里面添加下面内容，并把该文件导入到 `configuration.nix` 中：
+
+```bash
+# /etc/nixos/proxy.nix
+{ config, lib, pkgs, ... }:
+
+{
+  programs.clash-verge = {
+    enable = true;
+    package = pkgs.clash-verge-rev;  # 下载 clah-verge-rev
+    serviceMode = true;
+    tunMode = true;
+  };
+
+  # 启用 systemd DNS 解析器守护程序 systemd-resolved
+  services.resolved.enable = true;
+}
+```
+
+如果启用了 `systemd-resolved`（或其他任何 DNS 解析器），但仍然无法使用 TUN，则可能是启用了默认的 NixOS 防火墙。解决方法见 **6.1.1 故障排除**。
 
 ---
 

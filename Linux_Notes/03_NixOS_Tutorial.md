@@ -185,7 +185,7 @@ sudo /nix/var/nix/profiles/system/bin/switch-to-configuration switch
 sudo /nix/var/nix/profiles/system-10-link/bin/switch-to-configuration test
 ```
 
-## 3.3 历史记录（Generations）
+## 3.3 删除 Generations
 
 每当你运行 `sudo nixos-rebuild switch` 且配置发生了变化（也就是说，若构建出错被中断了，没有完成构建，是不会生成 Generation 的），NixOS 就会创建一个新的 Generation。它本质上是一个指向 `/nix/store` 中特定系统版本的软链接。
 
