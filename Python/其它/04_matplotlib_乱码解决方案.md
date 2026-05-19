@@ -15,11 +15,7 @@ plt.show()
 ```
 
 
-在 Linux 下使用 Python 的`matplotlib`包默认是会出现乱码的：
-
-[![乱码.png](https://s21.ax1x.com/2024/09/14/pAuEYVI.png)](https://imgse.com/i/pAuEYVI)
-
-或者在 Windows 下报这种错误：
+在 Linux 下使用 Python 的 `matplotlib` 包，中文字符默认是会出现乱码的，或者在 Windows 下报这种类似错误（缺失字体）：
 
 ```bash
 d:\Dev\Forest_FSL\preprocess\check_data.py:133: UserWarning: Glyph 23545 (\N{CJK UNIFIED IDEOGRAPH-5BF9}) missing from font(s) DejaVu Sans.
@@ -35,14 +31,14 @@ d:\Dev\Forest_FSL\preprocess\check_data.py:133: UserWarning: Glyph 23545 (\N{CJK
 
 ## 2.1 Linux 平台
 
-首先需要下载字体，网上常用的中文字体是`SimHei`，[下载地址](https://github.com/StellarCN/scp_zh/blob/master/fonts/SimHei.ttf)
+首先需要下载字体，网上常用的中文字体是 `SimHei`，[下载地址](https://github.com/StellarCN/scp_zh/blob/master/fonts/SimHei.ttf)
 
-### 2.1.1 方式一：直接在代码中引入
+### 2.1.1 方式一：直接在代码中引入（推荐）
 
 ```python
 import matplotlib.font_manager as fm
 
-font_path = "/home/sky/下载/SimHei.ttf"  # 设置字体路径
+font_path = "/home/sky/下载/SimHei.ttf"  # 设置字体路径（或者其他中文字体的路径）
 my_font = fm.FontProperties(fname=font_path)
 
 # 手动注册字体
@@ -73,25 +69,25 @@ print(matplotlib.matplotlib_fname())   # 查找字体路径
 /home/sky/miniconda3/envs/test/lib/python3.12/site-packages/matplotlib/mpl-data/matplotlibrc
 ```
 
-`matplotlibrc`是配置文件，一会儿要修改的。然后进入存放字体的目录下：
+`matplotlibrc` 是配置文件，一会儿要修改的。然后进入存放字体的目录下：
 
 ```bash
 cd /home/sky/miniconda3/envs/test/lib/python3.12/site-packages/matplotlib/mpl-data/fonts/ttf
 ```
 
-把下载好的字体文件`SimHei.ttf`复制到`ttf`目录下：
+把下载好的字体文件 `SimHei.ttf` 复制到 `ttf` 目录下：
 
 ```bash
 cp ~/下载/SimHei.ttf .  
 ```
 
-然后回到`mpl-data`目录下，修改`matplotlibrc`文件：
+然后回到 `mpl-data` 目录下，修改 `matplotlibrc` 文件：
 
 ```bash
 nano matplotlibrc
 ```
 
-找到`font.serif`，`font.sans-serif`所在位置，如下如所示。在冒号后面加入`SimHei`，保存退出：
+找到 `font.serif`，`font.sans-serif` 所在位置，如下如所示。在冒号后面加入 `SimHei`，保存退出：
 
 - 原来的：
 
@@ -106,8 +102,6 @@ nano matplotlibrc
 #font.serif:      SimHei, DejaVu Serif, Bitstream Vera Serif, Computer Modern Roman, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
 #font.sans-serif: SimHei, DejaVu Sans, Bitstream Vera Sans, Computer Modern Sans Serif, Lucida Grande, Verdana, Geneva, Lucid, Arial, Helvetica, Avant Garde, sans-serif
 ```
-
-[![修改示意图](https://s21.ax1x.com/2024/09/15/pAuJFz9.md.png)](https://imgse.com/i/pAuJFz9)
 
 2. **清理缓存**
 
@@ -139,18 +133,7 @@ plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
 
 ---
 
-# 3.解决示例
-
-[![正常输出.png](https://s21.ax1x.com/2024/09/14/pAuERiV.png)](https://imgse.com/i/pAuERiV)
-
-## 3.1 参考教程
-
-- [【Deepin20系统】Linux系统中永久解决matplotlib画图中文乱码问题和使用seaborn中文乱码问题](https://developer.aliyun.com/article/1577567)
-- [解决Python使用matplotlib绘图时出现的中文乱码问题](https://cloud.tencent.com/developer/article/1877673)
-
----
-
-# 4.负号乱码解决
+# 3.负号乱码解决
 
 只要在前面加以段这个代码：
 
@@ -160,3 +143,10 @@ plt.rcParams["axes.unicode_minus"] = False
 ```
 
 就能正常显示负号。
+
+---
+
+# 4. 参考教程
+
+- [【Deepin20系统】Linux系统中永久解决matplotlib画图中文乱码问题和使用seaborn中文乱码问题](https://developer.aliyun.com/article/1577567)
+- [解决Python使用matplotlib绘图时出现的中文乱码问题](https://cloud.tencent.com/developer/article/1877673)
