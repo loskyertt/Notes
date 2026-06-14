@@ -713,4 +713,4 @@ reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation
 ```
 
 > [!tip]
-> 推荐方式二，这样两个系统都使用 UTC 时间，避免冲突。详见 [[双系统时间配置]]。
+> 推荐方式二，这样两个系统都使用 UTC 时间，避免冲突。详见 [[Grub_配置#4.2 双系统时间不同步]]。
