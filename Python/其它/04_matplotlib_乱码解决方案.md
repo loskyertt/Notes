@@ -131,6 +131,9 @@ plt.rcParams["font.sans-serif"] = ["SimHei"]  # 黑体
 plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
 ```
 
+> [!note]
+> Linux 上也可以这样手动指定字体名称，前提是该字体得支持中文字体，如果出现乱码的情况，建议先删除 `~/.cache/matplotlib/fontlist-v390.json` 这个缓存文件，该文件包含系统字体的索引缓存。
+
 ---
 
 # 3.负号乱码解决
