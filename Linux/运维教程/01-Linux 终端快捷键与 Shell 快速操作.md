@@ -20,6 +20,8 @@ Linux 运维大量工作发生在终端中。熟悉终端快捷键后，可以�
 > [!summary]
 > 终端快速操作的核心：**命令行编辑靠 Readline，历史复用靠 history，任务控制靠 job control，长会话托管靠 tmux**。
 
+---
+
 # 2. 命令行编辑快捷键
 
 多数 Bash、Zsh 和交互式命令行工具默认支持 GNU Readline 风格快捷键。
@@ -30,11 +32,10 @@ Linux 运维大量工作发生在终端中。熟悉终端快捷键后，可以�
 |---|---|---|
 | `Ctrl+A` | 移动到行首 | Ahead |
 | `Ctrl+E` | 移动到行尾 | End |
-| `Ctrl+B` | 向左移动一个字符 | Backward |
-| `Ctrl+F` | 向右移动一个字符 | Forward |
-| `Alt+B` | 向左移动一个单词 | Backward word |
-| `Alt+F` | 向右移动一个单词 | Forward word |
-| `Ctrl+XX` | 在当前位置和行首之间切换 | 快速往返 |
+| `Ctrl+B` / `left` | 向左移动一个字符 | Backward |
+| `Ctrl+F` / `right` | 向右移动一个字符 | Forward |
+| `Alt+B` / `ctrl+left` | 向左移动一个单词 | Backward word |
+| `Alt+F` / `ctrl + right` | 向右移动一个单词 | Forward word |
 
 > [!tip]
 > 长命令改参数时，`Ctrl+A`、`Ctrl+E`、`Alt+B`、`Alt+F` 最实用，可以避免按方向键按到手软。
@@ -45,12 +46,12 @@ Linux 运维大量工作发生在终端中。熟悉终端快捷键后，可以�
 |---|---|
 | `Ctrl+U` | 删除光标前所有内容 |
 | `Ctrl+K` | 删除光标后所有内容 |
+| `Ctrl+_` | 撤销上一次编辑，部分终端也支持 `Ctrl+/` |
 | `Ctrl+W` | 删除光标前一个单词 |
 | `Alt+D` | 删除光标后一个单词 |
 | `Ctrl+H` | 删除光标前一个字符，等同 Backspace |
-| `Ctrl+D` | 删除光标处字符；空行时退出 shell |
+| `Ctrl+D` | 删除光标处字符，等同于 Delete；空行时退出 shell |
 | `Ctrl+Y` | 粘贴刚删除的内容 |
-| `Ctrl+_` | 撤销上一次编辑，部分终端也支持 `Ctrl+/` |
 | `Ctrl+T` | 交换光标前两个字符 |
 | `Alt+T` | 交换光标附近两个单词 |
 
@@ -66,6 +67,8 @@ Linux 运维大量工作发生在终端中。熟悉终端快捷键后，可以�
 
 > [!warning]
 > 终端突然“没反应”但进程未退出时，先试 `Ctrl+Q`。很多时候是误按了 `Ctrl+S` 触发终端流控。
+
+---
 
 # 3. 历史命令复用
 
@@ -110,6 +113,8 @@ ls -l !$
 
 > [!warning]
 > 历史展开会在执行前替换为真实命令。对删除、覆盖、生产变更命令使用 `!!`、`!123` 前，务必确认展开后的内容。
+
+---
 
 # 4. 任务控制
 
@@ -158,15 +163,20 @@ disown
 > [!info]
 > `nohup` 适合简单临时任务；长期服务应使用 systemd 管理，便于自动重启、日志收集和开机自启。
 
+---
+
 # 5. 常用 Shell 快速语法
+
+> [!note]
+> 下面的 `cmd` 都是 `command`（命令）的简称。
 
 ## 5.1 重定向
 
 | 写法 | 含义 |
 |---|---|
-| `cmd > file` | 标准输出覆盖写入文件 |
-| `cmd >> file` | 标准输出追加写入文件 |
-| `cmd 2> err.log` | 标准错误写入文件 |
+| `cmd > file` | 标准输出**覆盖**写入文件 |
+| `cmd >> file` | 标准输出**追加**写入文件 |
+| `cmd 2> err.log` | 标准**错误**写入文件 |
 | `cmd > all.log 2>&1` | 标准输出和标准错误都写入文件 |
 | `cmd < file` | 从文件读取标准输入 |
 
@@ -194,6 +204,8 @@ mkdir -p /opt/myapp && cd /opt/myapp
 # 失败时输出提示
 systemctl is-active nginx || echo "nginx not running"
 ```
+
+---
 
 # 6. tmux 会话管理
 
@@ -229,6 +241,8 @@ systemctl is-active nginx || echo "nginx not running"
 > [!tip]
 > 远程排障、日志跟踪、发布操作建议放在 tmux 中进行，避免 SSH 断开导致上下文丢失。
 
+---
+
 # 7. 常见场景速查
 
 | 场景 | 推荐操作 |
@@ -245,6 +259,8 @@ systemctl is-active nginx || echo "nginx not running"
 | 回到前台 | `fg` |
 | SSH 长会话 | `tmux new -s name` |
 | 退出 tmux 但保留会话 | `Ctrl+B D` |
+
+---
 
 # 8. 易错点总结
 

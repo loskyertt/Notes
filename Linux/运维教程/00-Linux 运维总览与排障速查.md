@@ -33,6 +33,8 @@ aliases:
 > [!summary]
 > 运维的核心不是“记住所有命令”，而是按正确顺序缩小问题范围：**变更 → 状态 → 日志 → 资源 → 依赖 → 网络 → 回滚**。
 
+---
+
 # 2. 运维基本原则
 
 | 原则 | 含义 | 落地动作 |
@@ -45,7 +47,9 @@ aliases:
 | 区分环境 | 防止误操作生产 | 账号、域名、数据库、密钥隔离 |
 
 > [!warning]
-> 生产环境中，重启、删除、清库、改防火墙、改磁盘分区都属于高风险动作。执行前确认目标、影响范围、备份和回滚方案。
+> 生产环境中，重启、删除、清库、改防火墙、改磁盘分区都属于高风险动作。执行前确认目标、影响范围、**备份**和回滚方案。
+
+---
 
 # 3. 常用目录速查
 
@@ -67,49 +71,121 @@ aliases:
 > [!tip]
 > 记忆：`/etc` 放配置，`/var` 放变化数据，`/opt` 放业务或第三方应用，`/proc` 和 `/sys` 是运行时视图。
 
+---
+
 # 4. 基础状态检查
 
 ## 4.1 主机状态
 
-```bash
-hostnamectl
-uptime
-date
-timedatectl
-who
-w
-last
-```
+| 命令 | 功能 | 核心关注点 |
+| :--- | :--- | :--- |
+| `hostnamectl` | 看机器名字和系统版本 | 我在哪台机器上？什么系统？ |
+| `uptime` | 看机器活了多久和忙不忙 | 机器重启了吗？CPU 负载高不高？ |
+| `date` | 看当前时间 | 现在几点了？ |
+| `timedatectl` | 看时区和时间同步状态 | 时区对不对？NTP 同步开了没？ |
+| `who` | 看现在谁在线 | 当前有几个用户登录？ |
+| `w` | 看在线的人在干嘛 | 在线用户分别在敲什么命令？ |
+| `last` | 看过去谁来过 | 历史上谁从哪个 IP 登录过？ |
 
 ## 4.2 资源状态
 
-```bash
-# CPU、负载、内存
-top
-free -h
-vmstat 1
+### 4.2.1 top
 
-# 磁盘容量与 inode
-df -h
-df -i
-du -sh /var/*
+`top` 是 Linux 最常用的实时系统监控工具之一，可以查看 CPU、内存、进程等信息。
 
-# 进程
-ps aux --sort=-%cpu | head
-ps aux --sort=-%mem | head
-pgrep -af nginx
+1. 顶部信息解释，例如：
+
+```text
+top - 10:30:12 up 2 days,  3:15,  1 user,  load average: 0.25, 0.30, 0.28
+Tasks: 235 total,   1 running, 234 sleeping
+%Cpu(s):  2.1 us,  0.5 sy,  0.0 ni, 97.0 id
+MiB Mem : 15924 total,  4321 free,  5821 used,  5782 buff/cache
+MiB Swap:  4096 total,  4096 free,     0 used
 ```
+
+|字段|含义|
+|---|---|
+|load average|系统负载（1/5/15 分钟）|
+|us|用户态 CPU|
+|sy|内核态 CPU|
+|id|CPU 空闲率|
+|Mem|内存|
+|Swap|交换分区|
+
+2. 进程列表常用列：
+
+|列|含义|
+|---|---|
+|PID|进程 ID|
+|USER|用户|
+|PR|优先级|
+|NI|nice 值|
+|VIRT|虚拟内存|
+|RES|实际物理内存|
+|SHR|共享内存|
+|S|状态|
+|%CPU|CPU 占用|
+|%MEM|内存占用|
+|TIME+|累计 CPU 时间|
+|COMMAND|命令名|
+
+3. **`top` 运行时交互快捷键**
+
+在 `top` 运行界面中按下以下按键实现对应功能：
+
+| 快捷键 | 功能说明 | 备注 / 操作示例 |
+| :--- | :--- | :--- |
+| **`Shift + P`** (大写 P) | 按 CPU 使用率排序 | 按 `%CPU` 从高到低排序 |
+| **`Shift + M`** (大写 M) | 按内存使用率排序 | 按 `%MEM` 排序，查内存泄漏时常用 |
+| **`Shift + T`** (大写 T) | 按运行时间排序 | 按 `TIME+` 排序 |
+| **`Shift + R`** (大写 R) | 反转排序 | 实现升序/降序切换 |
+| **`H`** | 进程/线程视图切换 | 进程视图 ↔ 线程视图。调试 Java, MySQL, Redis 等多线程程序很有用 |
+| **`u`** | 查看特定用户 | 按下后输入用户名（如 `sky`），只显示该用户进程 |
+| **`L`** | 搜索进程 | 按下后输入关键字搜索 PID |
+| **`k`** | 杀死进程 | 按下后输入 `PID`，再输入信号（如 `15` 表示 SIGTERM，`9` 表示 SIGKILL）。等价于 `kill PID` |
+| **`r`** | 修改 Nice 值 | 按下后输入 `PID`，再输入优先级（如 `-5` 或 `10`）。等价于 `renice` |
+| **`c`** | 切换命令行显示 | COMMAND 列在程序名与完整参数间切换。<br>例：`python` ↔ `python train.py --batch-size 64 --lr 0.001` |
+| **`V`** | 树状显示进程 | 显示父子进程树状关系，类似 `pstree`（部分版本支持） |
+| **`i`** | 仅显示活跃进程 | 隐藏 `%CPU = 0` 的空闲进程 |
+| **`d`** | 修改刷新间隔 | 按下后输入数字（如 `1` 表示 1 秒刷新一次，默认通常为 3 秒） |
+| **`f`** | 添加/删除显示列 | 进入字段配置界面，可勾选显示 PPID, UID, WCHAN, CGROUP 等字段 |
+
+4. **`top` 常用启动参数**
+
+在终端中输入 `top` 命令时直接附加的参数：
+
+| 启动命令 | 功能说明 | 示例 |
+| :--- | :--- | :--- |
+| **`-p <PID>`** | 查看单个指定进程 | `top -p 1234` |
+| **`-p <PID1,PID2>`**| 查看多个指定进程 | `top -p 1234,5678` |
+| **`-d <秒数>`** | 指定刷新时间间隔 | `top -d 1` （1 秒刷新一次） |
+| **`-u <用户名>`** | 仅查看指定用户的进程 | `top -u sky` |
+
+### 4.2.2 其它
+
+| 命令 | 功能 | 典型使用场景 |
+| :--- | :--- | :--- |
+| `free -h` | 看内存还剩多少 | 确认内存有没有爆 |
+| `vmstat 1` | 每秒看一次系统状态趋势 | 排查是 CPU 瓶颈还是磁盘 IO 瓶颈 |
+| `df -h` | 看磁盘空间剩多少 | 报错“磁盘满”时，先看这个确认 |
+| `df -i` | 看文件数量(inode)上限 | 磁盘没满但报错，排查是不是小文件太多 |
+| `du -sh /var/*` | 看某个目录占了多大空间 | 磁盘满了，顺藤摸瓜找大文件在哪 |
+| `ps aux --sort=-%cpu \| head` | 找最吃 CPU 的前 10 个进程 | CPU 飙升到 100%，抓元凶 |
+| `ps aux --sort=-%mem \| head` | 找最吃内存的前 10 个进程 | 内存快满了，抓元凶 |
+| `pgrep -af nginx` | 找指定程序的进程号 | 确认 Nginx 是否在跑，PID 是多少 |
 
 ## 4.3 网络状态
 
-```bash
-ip addr
-ip route
-ss -tulpen
-ss -antp
-dig example.com
-curl -v https://example.com
-```
+| 命令 | 一句话总结 | 典型使用场景 |
+| :--- | :--- | :--- |
+| `ip addr` | 看本机有哪些网卡和 IP | 确认服务器 IP 配好没有 |
+| `ip route` | 看网关和路由表怎么走 | 有 IP 但连不上外网，查网关 |
+| `ss -tulpen` | 看哪些端口在提供服务 | 确认 Nginx 到底在没在 80 端口蹲守 |
+| `ss -antp` | 看当前的 TCP 连接情况 | 查看有没有客户端连进来，有没有僵尸连接 |
+| `dig` | 查域名解析到的 IP | 排查域名配没配对 |
+| `curl -v` | 模拟浏览器发 HTTP 请求 | 排查网站打不开，看状态码或证书是否报错 |
+
+---
 
 # 5. 服务排障流程
 
@@ -117,7 +193,7 @@ curl -v https://example.com
 
 1. 确认最近是否有发布、配置、扩容、证书、网络、安全组或数据库变更。
 2. 查看服务状态：`systemctl status <service>`。
-3. 查看服务日志：`journalctl -u <service> -n 100`。
+3. 查看服务最近 100 行的日志：`journalctl -u <service> -n 100`。
 4. 查看端口监听：`ss -tulpen | grep <port>`。
 5. 查看进程资源：`top`、`ps`、`pidstat`。
 6. 查看依赖状态：数据库、Redis、消息队列、外部 HTTP/RPC。
@@ -126,7 +202,7 @@ curl -v https://example.com
 ```bash
 systemctl status myapp
 journalctl -u myapp -n 100
-journalctl -u myapp -f
+journalctl -u myapp -f  # 该命令类似于 tail -f <日志文件名>
 ss -tulpen | grep 8080
 curl -v http://127.0.0.1:8080/health
 ```
@@ -148,6 +224,8 @@ curl -v http://127.0.0.1:8080/health
 | 502 | 网关错误 | upstream 进程、端口、协议 |
 | 503 | 服务不可用 | 限流、维护、upstream 不可用 |
 | 504 | 网关超时 | upstream 慢、超时配置 |
+
+---
 
 # 6. 日志排查速查
 
@@ -179,6 +257,8 @@ awk '{print $1}' access.log | sort | uniq -c | sort -nr | head
 > [!tip]
 > 日志排查优先关注：错误时间、请求 ID、错误级别、堆栈、上游依赖、重试、超时、状态码和最近变更。
 
+---
+
 # 7. 网络排查路线
 
 ## 7.1 四步法
@@ -207,6 +287,8 @@ openssl s_client -connect example.com:443 -servername example.com
 | HTTPS 异常 | 证书过期、SNI、链不完整 | `openssl s_client` |
 | 请求慢 | DNS、网络、TLS、服务端慢 | `curl -w`、日志、指标 |
 
+---
+
 # 8. 磁盘与容量排查
 
 ```bash
@@ -228,6 +310,8 @@ lsof | grep deleted
 
 > [!warning]
 > `df` 显示磁盘满但 `du` 找不到大文件时，常见原因是文件已删除但进程仍持有句柄。用 `lsof | grep deleted` 定位后，重启对应进程释放空间。
+
+---
 
 # 9. CPU 与内存排查
 
@@ -265,6 +349,8 @@ cat /proc/<PID>/status | grep -E 'VmRSS|VmSize|Threads'
 - 连接泄漏。
 - 容器内存限制过小。
 
+---
+
 # 10. 数据库与缓存速查
 
 ## 10.1 MySQL / MariaDB
@@ -299,6 +385,8 @@ SCAN 0 MATCH prefix:* COUNT 100
 > [!warning]
 > 生产环境避免执行 `KEYS *`，它可能阻塞 Redis。优先使用 `SCAN` 分批扫描。
 
+---
+
 # 11. 发布与变更检查
 
 发布或配置变更前确认：
@@ -319,6 +407,8 @@ journalctl -u myapp -n 100
 curl -f http://127.0.0.1:8080/health
 ss -tulpen | grep 8080
 ```
+
+---
 
 # 12. 高危命令清单
 
@@ -349,6 +439,8 @@ FLUSHDB
 FLUSHALL
 KEYS *
 ```
+
+---
 
 # 13. 事故复盘模板
 
@@ -393,6 +485,8 @@ KEYS *
 > [!summary]
 > 复盘重点是改进系统和流程，而不是追责个人。每个改进项都应有负责人、截止时间和验证方式。
 
+---
+
 # 14. 高频命令索引
 
 | 场景 | 命令 |
@@ -413,6 +507,8 @@ KEYS *
 | DNS | `dig domain` |
 | SSH | `ssh user@host` |
 | 同步文件 | `rsync -av src/ dst/` |
+
+---
 
 # 15. 学习路线
 
