@@ -469,20 +469,420 @@ export PS1='[\u@\h \w \t]\$ '
 > 3. 确认变量是否生效：`echo $VAR_NAME`
 > 4. 确认加载顺序：在 `set -x` 模式下启动 Bash 观察执行过程
 
-## 4.4 zsh 用户的差异
+---
 
-如果使用 zsh（`echo $SHELL` 输出 `/bin/zsh`），历史文件为 `~/.zsh_history`，默认格式：
-
-```text
-: 1749520000:0;git status
-: 1749520010:0;vim main.cpp
-```
-
-同样只有时间戳，无目录信息。需额外配置：
+# 5. 推荐的 bash 配置
 
 ```bash
-# 在 ~/.zshrc 中添加
-precmd() {
-    print -sr -- "$(pwd) ::: $(history -1)"
+# ============================================================
+#  .bashrc — 服务端运维优化版
+#  适用：Ubuntu / Debian / CentOS / RHEL 及各主流 Linux 发行版
+# ============================================================
+
+# 非交互式 shell 直接返回
+[[ $- != *i* ]] && return
+
+# ============================================================
+#  PATH
+# ============================================================
+# 注意：前后加冒号 (:) 是为了防止 /a/b 匹配到 /a/bc 这种情况
+[[ -d "$HOME/.bin" && ":$PATH:" != *":$HOME/.bin:"* ]] && PATH="$HOME/.bin:$PATH"
+[[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]] && PATH="$HOME/.local/bin:$PATH"
+
+# ============================================================
+#  EXPORT — 环境变量
+# ============================================================
+export EDITOR='vim'
+export VISUAL='vim'
+export PAGER='less'
+export LESS='-R --quit-if-one-screen'
+
+# 历史记录：忽略重复 & 空格开头，保留 50000 条
+export HISTCONTROL=ignoreboth:erasedups
+export HISTSIZE=50000
+export HISTFILESIZE=100000
+export HISTTIMEFORMAT='%F %T  '   # 每条命令显示时间戳
+
+# ============================================================
+#  SHOPT — shell 选项
+# ============================================================
+shopt -s autocd        # 直接输入目录名即可 cd
+shopt -s cdspell       # cd 拼写自动纠错
+shopt -s cmdhist       # 多行命令保存为单行历史
+shopt -s histappend    # 追加历史，不覆盖
+shopt -s checkwinsize  # 每次命令后更新窗口尺寸
+
+# TAB 补全忽略大小写
+bind "set completion-ignore-case on"
+
+# 多个匹配时立即列出
+bind "set show-all-if-ambiguous on"
+
+# 第一次 TAB 显示所有候选
+bind "set show-all-if-unmodified on"
+
+# 补全时把 symlink 当目录处理
+bind "set mark-symlinked-directories on"
+
+# ============================================================
+#  PROMPT — PS1
+# ============================================================
+
+# Git 官方 Prompt（存在时加载）
+if [[ -f /usr/share/git/completion/git-prompt.sh ]]; then
+    source /usr/share/git/completion/git-prompt.sh
+fi
+
+update_prompt() {
+    local exit_code=$?
+
+    local green="\[\e[32m\]"
+    local red="\[\e[31m\]"
+    local yellow="\[\e[33m\]"
+    local cyan="\[\e[36m\]"
+    local magenta="\[\e[35m\]"
+    local reset="\[\e[0m\]"
+    local bold="\[\e[1m\]"
+
+    # 时间
+    local datetime
+    datetime=$(date +'%m/%d %H:%M')
+
+    # Git 分支（仅在 Git 仓库内显示）
+    local git_br=""
+    if declare -F __git_ps1 >/dev/null 2>&1; then
+        git_br="$(__git_ps1 " (%s)")"
+    fi
+
+    # 上条命令退出码（非 0 才显示）
+    local status=""
+    if (( exit_code != 0 )); then
+        status=" ${red}[✘${exit_code}]${reset}"
+    fi
+
+    # root / 普通用户提示符
+    local symbol
+    if (( EUID == 0 )); then
+        symbol="${red}#${reset}"
+    else
+        symbol="${green}\$${reset}"
+    fi
+
+    PS1="\n${bold}${green}[${cyan}${datetime}${green}] ${red}\u${green}@${yellow}\h${reset}:${cyan}\w${magenta}${git_br}${reset}${status}\n${bold}${symbol} ${reset}"
 }
+
+# 保留已有 PROMPT_COMMAND
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }update_prompt"
+
+# ============================================================
+#  ALIASES — 基础
+# ============================================================
+
+# 文件列表
+alias ls='ls --color=auto'
+alias ll='ls -alFh'
+alias la='ls -A'
+alias l='ls -CF'
+alias lh='ls -lhS'                  # 按文件大小排序
+alias lt='ls -lhtr'                 # 按修改时间排序（最新在底部）
+
+# 导航
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias back='cd -'                   # 返回上一个目录
+
+# 安全操作
+alias rmi='rm -I'
+alias cpi='cp -i'
+alias mvi='mv -i'
+alias mkdir='mkdir -pv'
+
+# grep / 搜索
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias rg='rg --sort path'           # ripgrep（需安装）
+
+# 杂项
+alias df='df -hT'                   # 显示文件系统类型
+alias du='du -h'
+alias free='free -mht'
+alias wget='wget -c'                 # 断点续传
+alias path='echo $PATH | tr ":" "\n"'
+alias now='date +"%Y-%m-%d %H:%M:%S %Z"'
+alias cls='clear'
+alias h='history'
+alias j='jobs -l'
+alias which='which -a'
+
+# ============================================================
+#  ALIASES — 进程 & 系统监控
+# ============================================================
+alias psa='ps auxf'
+alias psm='ps aux --sort=-%mem | head -20'      # 内存占用 Top20
+alias psc='ps aux --sort=-%cpu | head -20'      # CPU 占用 Top20
+
+alias top='top -c'
+# 优先使用 htop / btop（如已安装）
+alias ht='htop'
+alias bt='btop'
+
+# 快速计时
+alias rtime='/usr/bin/time -v'
+
+# ============================================================
+#  ALIASES — 网络诊断
+# ============================================================
+alias ip='ip --color=auto'
+alias ipa='ip -br addr'             # 简洁显示 IP 地址
+alias ipr='ip -br route'            # 路由表
+alias ports='ss -tulnp'             # 监听端口（替代 netstat）
+alias lsports='lsof -i -P -n'       # 所有网络连接
+alias myip='curl -s https://ifconfig.me && echo'
+alias myip6='curl -s https://api64.ipify.org && echo'
+alias ping5='ping -c 5'
+alias nmap-quick='nmap -sV --open'
+
+# DNS 查询
+alias digs='dig +short'
+alias digfull='dig +noall +answer +authority'
+alias nslook='nslookup'
+
+# 带宽监控（需安装对应工具）
+alias bwmon='iftop -n'              # 实时带宽
+alias nethogs='nethogs'             # 按进程显示带宽
+
+# ============================================================
+#  ALIASES — 日志查看
+# ============================================================
+alias jctl='journalctl -p 3 -xb'                   # 本次启动的错误日志
+alias jctlf='journalctl -f'                         # 实时跟踪日志
+alias jctlu='journalctl -u'                         # 用法: jctlu nginx
+alias syslog='tail -f /var/log/syslog'
+alias messages='tail -f /var/log/messages'
+alias authlog='tail -f /var/log/auth.log'
+alias kernlog='dmesg -T | tail -50'                 # 带时间戳的内核日志
+alias lastlog='last -n 20'                          # 最近登录记录
+alias faillog='lastb -n 20 2>/dev/null || journalctl _SYSTEMD_UNIT=sshd.service | grep "Failed"'
+
+# ============================================================
+#  ALIASES — systemd 服务管理
+# ============================================================
+alias sc='systemctl'
+alias scs='systemctl status'
+alias scst='systemctl start'
+alias scsp='systemctl stop'
+alias scr='systemctl restart'
+alias scrl='systemctl reload'
+alias sce='systemctl enable'
+alias scd='systemctl disable'
+alias scfail='systemctl list-units --failed'        # 列出失败的服务
+alias sclist='systemctl list-units --type=service --state=running'
+
+# ============================================================
+#  ALIASES — 防火墙
+# ============================================================
+# UFW（Debian/Ubuntu 系）
+alias ufw-status='sudo ufw status verbose'
+alias ufw-list='sudo ufw status numbered'
+
+# firewalld（RHEL/CentOS 系）
+alias fw-status='sudo firewall-cmd --state'
+alias fw-list='sudo firewall-cmd --list-all'
+
+# iptables 查看
+alias ipt='sudo iptables -L -n -v --line-numbers'
+alias ipt6='sudo ip6tables -L -n -v --line-numbers'
+
+# ============================================================
+#  ALIASES — 磁盘 & 存储
+# ============================================================
+alias duf='df -hT | grep -v tmpfs'             # 过滤临时文件系统
+alias dush='du -sh * | sort -rh | head -20'    # 当前目录各项大小 Top20
+alias iostat='iostat -xz 1 5'                  # I/O 统计
+alias lsblkh='lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,UUID'
+
+# ============================================================
+#  ALIASES — SSH / 远程
+# ============================================================
+alias scp='scp -p'
+alias ssh-keygen-ed='ssh-keygen -t ed25519 -C'  # 用法: ssh-keygen-ed "comment"
+alias who-ssh='who | grep pts'                  # 列出当前 SSH 连接
+
+# ============================================================
+#  ALIASES — Docker（如使用）
+# ============================================================
+alias d='docker'
+alias dps='docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}"'
+alias dpsa='docker ps -a --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}"'
+alias di='docker images'
+alias dex='docker exec -it'                    # 用法: dex <容器名> bash
+alias dlog='docker logs -f --tail 100'         # 用法: dlog <容器名>
+alias dstop='docker stop $(docker ps -q)'      # 停止所有容器
+alias dprune='docker system prune -f'
+alias dc='docker-compose'
+alias dcu='docker-compose up -d'
+alias dcd='docker-compose down'
+alias dcl='docker-compose logs -f'
+
+# ============================================================
+#  ALIASES — Git（运维场景）
+# ============================================================
+alias gs='git status -sb'
+alias gp='git pull'
+alias glog='git log --oneline --graph --decorate -20'
+alias gdiff='git diff --stat'
+
+# ============================================================
+#  ALIASES — 包管理（按发行版自动选择）
+# ============================================================
+if command -v apt &>/dev/null; then
+    alias update='sudo apt update && sudo apt upgrade -y'
+    alias install='sudo apt install'
+    alias search='apt search'
+    alias remove='sudo apt remove'
+    alias autoremove='sudo apt autoremove -y'
+elif command -v dnf &>/dev/null; then
+    alias update='sudo dnf upgrade -y'
+    alias install='sudo dnf install'
+    alias search='dnf search'
+    alias remove='sudo dnf remove'
+    alias autoremove='sudo dnf autoremove -y'
+elif command -v yum &>/dev/null; then
+    alias update='sudo yum update -y'
+    alias install='sudo yum install'
+    alias search='yum search'
+    alias remove='sudo yum remove'
+fi
+
+# ============================================================
+#  FUNCTIONS — 实用函数
+# ============================================================
+
+# 用法: psgrep nginx
+psg() {
+    ps aux | grep -i "$1" | grep -v grep
+}
+
+# 监听端口
+listen() {
+    ss -tulnp | grep "$1"
+}
+
+# 推送并显示进度
+rsync-push() {
+    rsync -avzP --stats "$1" "$2"
+}
+
+# 拉取并显示进度
+rsync-pull() {
+    rsync -avzP --stats "$1" "$2"
+}
+
+# 解压：支持常见格式
+ex() {
+    if [[ -f "$1" ]]; then
+        case "$1" in
+            *.tar.bz2)  tar xjf "$1"   ;;
+            *.tar.gz)   tar xzf "$1"   ;;
+            *.tar.xz)   tar xJf "$1"   ;;
+            *.tar.zst)  tar --zstd -xf "$1" ;;
+            *.tar)      tar xf  "$1"   ;;
+            *.bz2)      bunzip2 "$1"   ;;
+            *.gz)       gunzip  "$1"   ;;
+            *.rar)      unrar x "$1"   ;;
+            *.zip)      unzip   "$1"   ;;
+            *.Z)        uncompress "$1" ;;
+            *.7z)       7z x    "$1"   ;;
+            *.deb)      ar x    "$1"   ;;
+            *)          echo "'$1' 无法识别的压缩格式" ;;
+        esac
+    else
+        echo "'$1' 不是有效文件"
+    fi
+}
+
+# mkcd：创建目录并进入
+mkcd() { mkdir -p "$1" && cd "$1" || return; }
+
+# 查找进程并显示（带 PID）
+pf() { ps aux | grep -v grep | grep -i "$1"; }
+
+# 查看端口占用
+whichport() { lsof -i :"$1"; }
+
+# 查看某服务的日志（最近 N 行，默认 100）
+svclog() {
+    local svc="$1"
+    local lines="${2:-100}"
+    journalctl -u "$svc" -n "$lines" --no-pager
+}
+
+# 快速备份文件（追加时间戳）
+bak() { cp -v "$1" "${1}.bak.$(date +%Y%m%d_%H%M%S)"; }
+
+# 统计目录下各扩展名文件数量
+ext-count() {
+    find "${1:-.}" -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
+}
+
+# SSH 隧道快捷方式
+# 用法: tunnel <本地端口> <远端主机> <远端端口> [跳板机]
+tunnel() {
+    local local_port="$1"
+    local remote_host="$2"
+    local remote_port="$3"
+    local jump_host="${4:-}"
+    if [[ -n "$jump_host" ]]; then
+        ssh -J "$jump_host" -L "${local_port}:${remote_host}:${remote_port}" -N "$remote_host"
+    else
+        ssh -L "${local_port}:localhost:${remote_port}" -N "$remote_host"
+    fi
+}
+
+# 等待某主机端口开放（用于脚本等待服务启动）
+wait-port() {
+    local host="$1"
+    local port="$2"
+    local timeout="${3:-60}"
+    echo "等待 ${host}:${port} 开放（超时 ${timeout}s）..."
+    local start=$SECONDS
+    until nc -z "$host" "$port" 2>/dev/null; do
+        if (( SECONDS - start >= timeout )); then
+            echo "超时！${host}:${port} 仍未开放"
+            return 1
+        fi
+        sleep 1
+    done
+    echo "${host}:${port} 已开放（耗时 $((SECONDS - start))s）"
+}
+
+# 快速查看系统概况
+sysinfo() {
+    echo "=== 系统信息 ==="
+    echo "主机名:  $(hostname -f)"
+    echo "系统:    $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2)"
+    echo "内核:    $(uname -r)"
+    echo "运行时间:$(uptime -p)"
+    echo "负载:    $(uptime | awk -F'load average:' '{print $2}')"
+    echo ""
+    echo "=== CPU ==="
+    echo "核心数:  $(nproc)"
+    grep "model name" /proc/cpuinfo | head -1 | awk -F': ' '{print "型号:   "$2}'
+    echo ""
+    echo "=== 内存 ==="
+    free -h
+    echo ""
+    echo "=== 磁盘 ==="
+    df -hT | grep -v tmpfs | grep -v devtmpfs
+    echo ""
+    echo "=== 网络接口 ==="
+    ip -br addr
+}
+
+# ============================================================
+#  个人配置文件（不被覆盖，建议在此添加私人 alias）
+# ============================================================
+[[ -f ~/.bashrc-local ]] && source ~/.bashrc-local
 ```
