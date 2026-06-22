@@ -262,6 +262,93 @@ Settings → Build, Execution, Deployment → CMake
 | 自动创建 | 若远端目录不存在，CLion 会自动创建 |
 | 路径格式 | 推荐使用绝对路径（`/home/user/...`）而非 `~`，避免某些环境下 tilde 展开失败 |
 
+## 6.3 CLion 版本与远程服务器 cmake 版本不匹配
+
+**现象**：如果远程服务器的 cmake 版本过低，但是主机的 CLion 版本比较新，在用远程服务器的 cmake 进行构建时，可能会出现下面这种情况：
+
+```bash
+/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /data/home/loskyertt/Dev/a5game/server/trunk/server/src
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /data/home/loskyertt/Dev/a5game/server/trunk/server/src/cmake-build-debug-remote
+无法读取 Z:\a5game\server\trunk\server\src\cmake-build-debug-remote\CMakeFiles\TargetDirectories.txt
+```
+
+如果远程工作目录和本地工作目录的映射已经确定没有弄错，那么这种情况通常是远程 CMake 版本过老导致 CLion 解析失败。
+
+因此可以在远程服务器安装一个较新版本的 cmake，如果没有 sudo 安装权限，可以把 cmake 安装在自己的用户目录下。
+
+根据服务器的架构（一般是 x86_64）直接下载官方二进制包，然后：
+
+```bash
+mkdir -p ~/tools
+cd ~/tools
+
+wget https://github.com/Kitware/CMake/releases/download/v3.31.8/cmake-3.31.8-linux-x86_64.tar.gz
+
+tar -xf cmake-3.31.8-linux-x86_64.tar.gz
+```
+
+> [!tip]
+> 如果在服务器上不允许访问外网，可以先把 cmake-3.31.8-linux-x86_64.tar.gz 下载到本地，然后上传到服务器中：
+> 
+> ```bash
+> scp cmake-3.31.8-linux-x86_64.tar.gz loskyertt@<服务器 IP>:~/tools/
+> ```
+
+解压后：
+
+```text
+~/tools/cmake-3.31.8-linux-x86_64/
+├── bin
+├── share
+└── ...
+```
+
+测试：
+
+```bash
+~/tools/cmake-3.31.8-linux-x86_64/bin/cmake --version
+```
+
+应该看到：
+
+```text
+cmake version 3.31.8
+```
+
+然后再配置 CLion，进入：
+
+```text
+Settings
+→ Build, Execution, Deployment
+→ Toolchains
+```
+
+找到：
+
+```text
+CMake:
+```
+
+原来可能是：
+
+```text
+/usr/bin/cmake
+```
+
+改成：
+
+```text
+/home/loskyertt/tools/cmake-3.31.8-linux-x86_64/bin/cmake
+```
+
+然后点击：
+
+```text
+Reload CMake Project
+```
+
 ---
 
 # 7. 最佳实践

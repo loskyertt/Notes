@@ -245,6 +245,10 @@ Settings
 ✓ ClangFormat for all C/C++ files
 ```
 
+如下图所示：
+
+![[imgs/CLion_配置/01.png]]
+
 ### 方法 3：查看检测结果
 
 CLion 检测到 `.clang-format` 时会弹出提示：
@@ -293,6 +297,8 @@ SortIncludes: true
 
 > [!warning]
 > JetBrains 在 2024.3 和 2025.x 版本中对 ClangFormat 设置页做过调整，入口位置可能略有不同。如果找不到上述路径，请使用 `Ctrl + Shift + A` 搜索 `ClangFormat` 直接跳转。
+
+---
 
 ---
 
