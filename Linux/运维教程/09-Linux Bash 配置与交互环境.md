@@ -44,7 +44,7 @@ shopt -q login_shell && echo "login" || echo "non-login"
 ```
 
 > [!tip] 记忆技巧
-> 交互式关注"能不能打字"，登录式关注"有没有验过身份"。两者独立——SSH 登录是**交互式 + 登录**，图形终端新标签是**交互式 + 非登录**，`bash script.sh` 是**非交互式 + 非登录**。
+> 交互式关注”能不能打字“，登录式关注”有没有验过身份“。两者独立——SSH 登录是**交互式 + 登录**，图形终端新标签是**交互式 + 非登录**，`bash script.sh` 是**非交互式 + 非登录**。
 
 ---
 
@@ -483,6 +483,13 @@ export PS1='[\u@\h \w \t]\$ '
 [[ $- != *i* ]] && return
 
 # ============================================================
+#  HELPERS — 辅助函数
+# ============================================================
+_has() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# ============================================================
 #  PATH
 # ============================================================
 # 注意：前后加冒号 (:) 是为了防止 /a/b 匹配到 /a/bc 这种情况
@@ -533,6 +540,22 @@ if [[ -f /usr/share/git/completion/git-prompt.sh ]]; then
     source /usr/share/git/completion/git-prompt.sh
 fi
 
+# Git 分支 fallback：官方 git-prompt 不存在时使用
+git_branch_name() {
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+
+    local branch
+    branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null)
+
+    # detached HEAD 时显示短 commit
+    if [[ -z "$branch" ]]; then
+        branch=$(git rev-parse --short HEAD 2>/dev/null) || return 0
+        branch="detached:${branch}"
+    fi
+
+    [[ -n "$branch" ]] && printf ' (%s)' "$branch"
+}
+
 update_prompt() {
     local exit_code=$?
 
@@ -544,23 +567,21 @@ update_prompt() {
     local reset="\[\e[0m\]"
     local bold="\[\e[1m\]"
 
-    # 时间
     local datetime
     datetime=$(date +'%m/%d %H:%M')
 
-    # Git 分支（仅在 Git 仓库内显示）
     local git_br=""
     if declare -F __git_ps1 >/dev/null 2>&1; then
         git_br="$(__git_ps1 " (%s)")"
+    elif command -v git >/dev/null 2>&1; then
+        git_br="$(git_branch_name)"
     fi
 
-    # 上条命令退出码（非 0 才显示）
     local status=""
     if (( exit_code != 0 )); then
         status=" ${red}[✘${exit_code}]${reset}"
     fi
 
-    # root / 普通用户提示符
     local symbol
     if (( EUID == 0 )); then
         symbol="${red}#${reset}"
@@ -571,8 +592,9 @@ update_prompt() {
     PS1="\n${bold}${green}[${cyan}${datetime}${green}] ${red}\u${green}@${yellow}\h${reset}:${cyan}\w${magenta}${git_br}${reset}${status}\n${bold}${symbol} ${reset}"
 }
 
-# 保留已有 PROMPT_COMMAND
-PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }update_prompt"
+# 保留已有 PROMPT_COMMAND，并避免重复追加
+[[ "$PROMPT_COMMAND" != *update_prompt* ]] && \
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }update_prompt"
 
 # ============================================================
 #  ALIASES — 基础
@@ -600,9 +622,9 @@ alias mkdir='mkdir -pv'
 
 # grep / 搜索
 alias grep='grep --color=auto'
-alias egrep='egrep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias rg='rg --sort path'           # ripgrep（需安装）
+alias egrep='grep -E --color=auto'
+alias fgrep='grep -F --color=auto'
+_has rg && alias rg='rg --sort path'           # ripgrep（需安装）
 
 # 杂项
 alias df='df -hT'                   # 显示文件系统类型
@@ -615,6 +637,7 @@ alias cls='clear'
 alias h='history'
 alias j='jobs -l'
 alias which='which -a'
+alias typea='type -a'
 
 # ============================================================
 #  ALIASES — 进程 & 系统监控
@@ -625,8 +648,8 @@ alias psc='ps aux --sort=-%cpu | head -20'      # CPU 占用 Top20
 
 alias top='top -c'
 # 优先使用 htop / btop（如已安装）
-alias ht='htop'
-alias bt='btop'
+_has htop && alias ht='htop'
+_has btop && alias bt='btop'
 
 # 快速计时
 alias rtime='/usr/bin/time -v'
@@ -719,8 +742,7 @@ alias dpsa='docker ps -a --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Na
 alias di='docker images'
 alias dex='docker exec -it'                    # 用法: dex <容器名> bash
 alias dlog='docker logs -f --tail 100'         # 用法: dlog <容器名>
-alias dstop='docker stop $(docker ps -q)'      # 停止所有容器
-alias dprune='docker system prune -f'
+alias dprune-force='docker system prune -f'
 alias dc='docker-compose'
 alias dcu='docker-compose up -d'
 alias dcd='docker-compose down'
@@ -762,12 +784,20 @@ fi
 
 # 用法: psgrep nginx
 psg() {
-    ps aux | grep -i "$1" | grep -v grep
+    [[ -z "$1" ]] && echo "用法: psg <keyword>" && return 2
+    ps aux | grep -i -- "$1" | grep -v grep
 }
 
 # 监听端口
 listen() {
-    ss -tulnp | grep "$1"
+    if [[ -z "$1" ]]; then
+        echo "用法: listen <端口|关键字>"
+        echo "示例: listen 80"
+        echo "示例: listen nginx"
+        return 2
+    fi
+
+    ss -tulnp | grep --color=auto -F -- "$1"
 }
 
 # 推送并显示进度
@@ -780,51 +810,173 @@ rsync-pull() {
     rsync -avzP --stats "$1" "$2"
 }
 
-# 解压：支持常见格式
-ex() {
-    if [[ -f "$1" ]]; then
-        case "$1" in
-            *.tar.bz2)  tar xjf "$1"   ;;
-            *.tar.gz)   tar xzf "$1"   ;;
-            *.tar.xz)   tar xJf "$1"   ;;
-            *.tar.zst)  tar --zstd -xf "$1" ;;
-            *.tar)      tar xf  "$1"   ;;
-            *.bz2)      bunzip2 "$1"   ;;
-            *.gz)       gunzip  "$1"   ;;
-            *.rar)      unrar x "$1"   ;;
-            *.zip)      unzip   "$1"   ;;
-            *.Z)        uncompress "$1" ;;
-            *.7z)       7z x    "$1"   ;;
-            *.deb)      ar x    "$1"   ;;
-            *)          echo "'$1' 无法识别的压缩格式" ;;
-        esac
+# 停止所有容器
+dstop-all() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "错误: 未找到 docker 命令"
+        return 127
+    fi
+
+    local ids
+    ids=$(docker ps -q)
+
+    if [[ -z "$ids" ]]; then
+        echo "没有运行中的容器"
+        return 0
+    fi
+
+    docker ps
+    read -r -p "确认停止所有运行中的容器？[y/N] " ans
+
+    if [[ "$ans" == [yY] ]]; then
+        docker stop $ids
     else
-        echo "'$1' 不是有效文件"
+        echo "已取消"
+        return 1
     fi
 }
 
+# 解压：支持常见格式
+ex() {
+    if [[ -z "$1" ]]; then
+        echo "用法: ex <压缩文件>"
+        return 2
+    fi
+
+    if [[ ! -f "$1" ]]; then
+        echo "错误: 不是有效文件: $1"
+        return 1
+    fi
+
+    case "$1" in
+        *.tar.bz2)  tar xjf -- "$1" ;;
+        *.tar.gz|*.tgz) tar xzf -- "$1" ;;
+        *.tar.xz)   tar xJf -- "$1" ;;
+        *.tar.zst)  tar --zstd -xf -- "$1" ;;
+        *.tar)      tar xf -- "$1" ;;
+        *.bz2)      bunzip2 -- "$1" ;;
+        *.gz)       gunzip -- "$1" ;;
+        *.rar)
+            command -v unrar >/dev/null 2>&1 || { echo "错误: 未找到 unrar 命令"; return 127; }
+            unrar x -- "$1"
+            ;;
+        *.zip)
+            command -v unzip >/dev/null 2>&1 || { echo "错误: 未找到 unzip 命令"; return 127; }
+            unzip -- "$1"
+            ;;
+        *.Z)        uncompress -- "$1" ;;
+        *.7z)
+            command -v 7z >/dev/null 2>&1 || { echo "错误: 未找到 7z 命令"; return 127; }
+            7z x -- "$1"
+            ;;
+        *.deb)      ar x -- "$1" ;;
+        *)
+            echo "错误: 无法识别的压缩格式: $1"
+            return 2
+            ;;
+    esac
+}
+
 # mkcd：创建目录并进入
-mkcd() { mkdir -p "$1" && cd "$1" || return; }
+mkcd() {
+    if [[ -z "$1" ]]; then
+        echo "用法: mkcd <目录>"
+        return 2
+    fi
+
+    mkdir -p -- "$1" && cd -- "$1" || return
+}
 
 # 查找进程并显示（带 PID）
-pf() { ps aux | grep -v grep | grep -i "$1"; }
+pf() {
+    if [[ -z "$1" ]]; then
+        echo "用法: pf <关键字>"
+        echo "示例: pf nginx"
+        return 2
+    fi
+
+    ps aux | grep -F -i --color=auto -- "$1" | grep -F -v -- "grep -F -i"
+}
 
 # 查看端口占用
-whichport() { lsof -i :"$1"; }
+whichport() {
+    if [[ -z "$1" ]]; then
+        echo "用法: whichport <端口>"
+        echo "示例: whichport 80"
+        return 2
+    fi
+
+    if [[ ! "$1" =~ ^[0-9]+$ ]]; then
+        echo "错误: 端口必须是数字"
+        return 2
+    fi
+
+    if ! command -v lsof >/dev/null 2>&1; then
+        echo "错误: 未找到 lsof 命令"
+        return 127
+    fi
+
+    lsof -i :"$1"
+}
 
 # 查看某服务的日志（最近 N 行，默认 100）
 svclog() {
     local svc="$1"
     local lines="${2:-100}"
+
+    if [[ -z "$svc" ]]; then
+        echo "用法: svclog <服务名> [行数]"
+        echo "示例: svclog nginx 200"
+        return 2
+    fi
+
+    if [[ ! "$lines" =~ ^[0-9]+$ ]]; then
+        echo "错误: 行数必须是数字"
+        return 2
+    fi
+
+    if ! command -v journalctl >/dev/null 2>&1; then
+        echo "错误: 未找到 journalctl 命令"
+        return 127
+    fi
+
     journalctl -u "$svc" -n "$lines" --no-pager
 }
 
 # 快速备份文件（追加时间戳）
-bak() { cp -v "$1" "${1}.bak.$(date +%Y%m%d_%H%M%S)"; }
+bak() {
+    if [[ -z "$1" ]]; then
+        echo "用法: bak <文件>"
+        return 2
+    fi
+
+    if [[ ! -e "$1" ]]; then
+        echo "错误: 文件不存在: $1"
+        return 1
+    fi
+
+    if [[ -d "$1" ]]; then
+        echo "错误: bak 只用于备份普通文件，不处理目录: $1"
+        return 1
+    fi
+
+    cp -v -- "$1" "${1}.bak.$(date +%Y%m%d_%H%M%S)"
+}
 
 # 统计目录下各扩展名文件数量
 ext-count() {
-    find "${1:-.}" -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
+    local dir="${1:-.}"
+
+    if [[ ! -d "$dir" ]]; then
+        echo "错误: 不是有效目录: $dir"
+        return 1
+    fi
+
+    find "$dir" -type f -name '*.*' |
+        awk -F. '{print $NF}' |
+        sort |
+        uniq -c |
+        sort -rn
 }
 
 # SSH 隧道快捷方式
@@ -846,7 +998,30 @@ wait-port() {
     local host="$1"
     local port="$2"
     local timeout="${3:-60}"
+
+    if [[ -z "$host" || -z "$port" ]]; then
+        echo "用法: wait-port <主机> <端口> [超时秒数]"
+        echo "示例: wait-port 127.0.0.1 3306 30"
+        return 2
+    fi
+
+    if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+        echo "错误: 端口必须是数字"
+        return 2
+    fi
+
+    if [[ ! "$timeout" =~ ^[0-9]+$ ]]; then
+        echo "错误: 超时时间必须是数字"
+        return 2
+    fi
+
+    if ! command -v nc >/dev/null 2>&1; then
+        echo "错误: 未找到 nc 命令"
+        return 127
+    fi
+
     echo "等待 ${host}:${port} 开放（超时 ${timeout}s）..."
+
     local start=$SECONDS
     until nc -z "$host" "$port" 2>/dev/null; do
         if (( SECONDS - start >= timeout )); then
@@ -855,6 +1030,7 @@ wait-port() {
         fi
         sleep 1
     done
+
     echo "${host}:${port} 已开放（耗时 $((SECONDS - start))s）"
 }
 
