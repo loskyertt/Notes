@@ -608,6 +608,8 @@ graph TD
 
 ## 13.2 推荐基础配置
 
+> 双引号 `"` 开头的内容就是 .vimrc 的注释。
+
 ```vim
 " ===== 基础 =====
 set nocompatible            " 关闭 Vi 兼容模式
@@ -642,6 +644,10 @@ set fileencodings=utf-8,gbk,gb18030,big5
 set backspace=indent,eol,start  " Backspace 正常删除
 set mouse=a                      " 启用鼠标
 set laststatus=2                 " 始终显示状态栏
+
+" ===== 快捷键 =====
+nnoremap <F2> :set number!<CR>                " 按 F2 开启/关闭行号功能
+nnoremap <F3> :set relativenumber!<CR>        " 按 F3 开启/关闭相对行号功能
 ```
 
 > [!tip]
@@ -670,7 +676,7 @@ Vim 接收到鼠标点击
 
 ### 方法一：按住 Shift 再右键（推荐）
 
-按住 `Shift + 鼠标右键`，鼠标事件不会发送给终端程序，而是由终端软件自己处理。适用于 Xshell、MobaXterm、Windows Terminal、GNOME Terminal 等。
+在进行文本选中的时候按住 `Shift + 鼠标左键`，然后再按住 `Shift + 鼠标右键` 弹出菜单栏，鼠标事件不会发送给终端程序，而是由终端软件自己处理。适用于 Xshell、MobaXterm、Windows Terminal、GNOME Terminal 等。
 
 ### 方法二：临时关闭 Vim 鼠标
 

@@ -838,40 +838,69 @@ dstop-all() {
 
 # 解压：支持常见格式
 ex() {
-    if [[ -z "$1" ]]; then
+    local file="$1"
+
+    if [[ -z "$file" ]]; then
         echo "用法: ex <压缩文件>"
         return 2
     fi
 
-    if [[ ! -f "$1" ]]; then
-        echo "错误: 不是有效文件: $1"
+    if [[ ! -f "$file" ]]; then
+        echo "错误: 不是有效文件: $file"
         return 1
     fi
 
-    case "$1" in
-        *.tar.bz2)  tar xjf -- "$1" ;;
-        *.tar.gz|*.tgz) tar xzf -- "$1" ;;
-        *.tar.xz)   tar xJf -- "$1" ;;
-        *.tar.zst)  tar --zstd -xf -- "$1" ;;
-        *.tar)      tar xf -- "$1" ;;
-        *.bz2)      bunzip2 -- "$1" ;;
-        *.gz)       gunzip -- "$1" ;;
-        *.rar)
-            command -v unrar >/dev/null 2>&1 || { echo "错误: 未找到 unrar 命令"; return 127; }
-            unrar x -- "$1"
+    case "$file" in
+        *.tar|*.tar.gz|*.tgz|*.tar.bz2|*.tar.xz|*.tar.zst)
+            tar -xaf "$file"
             ;;
+
+        *.gz)
+            gunzip -- "$file"
+            ;;
+
+        *.bz2)
+            bunzip2 -- "$file"
+            ;;
+
         *.zip)
-            command -v unzip >/dev/null 2>&1 || { echo "错误: 未找到 unzip 命令"; return 127; }
-            unzip -- "$1"
+            command -v unzip >/dev/null 2>&1 || {
+                echo "错误: 未找到 unzip 命令"
+                return 127
+            }
+            unzip -- "$file"
             ;;
-        *.Z)        uncompress -- "$1" ;;
+
+        *.rar)
+            command -v unrar >/dev/null 2>&1 || {
+                echo "错误: 未找到 unrar 命令"
+                return 127
+            }
+            unrar x "$file"
+            ;;
+
         *.7z)
-            command -v 7z >/dev/null 2>&1 || { echo "错误: 未找到 7z 命令"; return 127; }
-            7z x -- "$1"
+            command -v 7z >/dev/null 2>&1 || {
+                echo "错误: 未找到 7z 命令"
+                return 127
+            }
+            7z x "$file"
             ;;
-        *.deb)      ar x -- "$1" ;;
+
+        *.Z)
+            uncompress -- "$file"
+            ;;
+
+        *.deb)
+            command -v ar >/dev/null 2>&1 || {
+                echo "错误: 未找到 ar 命令"
+                return 127
+            }
+            ar x "$file"
+            ;;
+
         *)
-            echo "错误: 无法识别的压缩格式: $1"
+            echo "错误: 无法识别的压缩格式: $file"
             return 2
             ;;
     esac
