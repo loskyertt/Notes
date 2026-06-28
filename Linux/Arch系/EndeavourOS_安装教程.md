@@ -422,7 +422,7 @@ eval "$(starship init zsh)"
 > 如果同时使用 zimfw 的主题（如 `steeef`）和 starship，两者会冲突。使用 starship 时，请在 `~/.zimrc` 中移除或注释掉 zimfw 的主题模块（如 `zmodule steeef` 和 `zmodule prompt-pwd`）。
 
 > [!info] 更多 zsh 配置
-> 详见 [zsh_配置](../系统配置/zsh_配置)。
+> 详见 [05_Zsh_配置](05_Zsh_配置.md)。
 
 ---
 

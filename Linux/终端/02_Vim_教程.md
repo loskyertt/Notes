@@ -46,6 +46,9 @@ Vim 的核心设计理念是**模态编辑**——在不同模式下，相同的
 | Emacs | 可选 | 陡峭 | 编程、扩展性强 | 原生支持 |
 | VS Code | 否 | 平缓 | 桌面编程 | 需 Remote 插件 |
 
+> [!note]
+> 可以通过 `vimtutor` 命令打开官方自带的 Vim 教程指南。
+
 ---
 
 # 2. 模态编辑核心
@@ -652,6 +655,312 @@ nnoremap <F3> :set relativenumber!<CR>        " 按 F3 开启/关闭相对行号
 
 > [!tip]
 > `set relativenumber` 配合 `5j`、`10k` 等数字移动非常高效——当前行显示 0，上下行显示相对距离，一眼就知道要跳几行。
+
+## 13.3 主题配置
+
+Vim 的配色主题（colorscheme）决定了语法高亮、背景、前景等颜色显示。配置主题有两种路径：
+
+| 方式 | 说明 | 适用场景 |
+|---|---|---|
+| **使用自带主题** | Vim 内置 20+ 个主题，零配置即用 | 快速上手、服务器环境 |
+| **安装第三方主题** | 如 gruvbox、tokyonight、catppuccin | 长期开发、追求美观 |
+
+> [!info]
+> Vim 主题的本质就是一个（或几个）`.vim` 文件，放置在 `colors/` 目录下。Vim 启动时会从 `runtimepath` 中的 `colors/` 目录加载主题。
+
+### 13.3.1 主题查找路径
+
+Vim 会在以下目录查找主题文件：
+
+| 系统 | 路径 |
+|---|---|
+| Linux/macOS | `~/.vim/colors/` |
+| Windows | `C:\Users\<用户名>\vimfiles\colors\` |
+| 全局（Linux） | `/usr/share/vim/vimXX/colors/`（XX 为版本号） |
+
+目录结构示例：
+
+```text
+~/.vim/
+└── colors/
+    ├── gruvbox.vim
+    ├── desert.vim
+    └── tokyonight.vim
+```
+
+### 13.3.2 使用自带主题
+
+#### 查看当前主题
+
+进入 Vim 后执行（`colorscheme` 可缩写为 `colo`）：
+
+```vim
+:colorscheme
+```
+
+#### 列出可用主题
+
+```vim
+:colorscheme <Tab>
+```
+
+连续按 `Tab`（或 `Ctrl+D`）即可列出所有可用主题。常见自带主题包括：
+
+```text
+blue       delek     industry  morning   pablo     quiet    ron     slate    zaibatsu
+darkblue   desert    koehler   lunaperche peachpuff retrobox shine  torte    zellner
+default    elflord   evening   murphy
+```
+
+![[imgs/02_Vim_教程/01.png]]
+
+> [!info]
+> 不同 Vim 版本内置主题略有不同，可用 `:colorscheme <Tab>` 查看实际列表。
+
+#### 设置主题
+
+**临时设置**（当前会话生效）：
+
+```vim
+:colorscheme desert
+" 或简写
+:colo evening
+```
+
+**永久生效**（写入 `~/.vimrc`）：
+
+```vim
+colorscheme desert
+```
+
+#### 背景模式
+
+部分主题支持根据背景模式（`dark` / `light`）自动调整配色：
+
+```vim
+set background=dark    " 深色背景
+set background=light   " 浅色背景
+```
+
+> [!warning]
+> ==必须先设置背景，再加载主题==，否则主题可能无法正确应用暗/亮模式：
+
+```vim
+set background=dark
+colorscheme desert
+```
+
+### 13.3.3 安装第三方主题
+
+第三方主题（如 gruvbox、tokyonight、catppuccin）通常色彩更丰富、对 True Color 支持更好。以 **gruvbox** 为例。
+
+安装方式有两种：
+
+| 方式 | 说明 | 适用 |
+|---|---|---|
+| **方式一：仅复制主题文件** | 只复制 `colors/gruvbox.vim` | 仅需基础配色 |
+| **方式二：完整安装** | 复制 `colors/` + `autoload/` | 需要 `:Gruvbox` 等命令、完整功能 |
+
+#### 通过插件管理器安装
+
+如果已使用插件管理器（如 vim-plug、Vundle、Pathogen），安装最简便。以 **vim-plug** 为例：
+
+```vim
+" 在 .vimrc 的 call plug#begin() 和 call plug#end() 之间
+Plug 'morhetz/gruvbox'
+```
+
+在 Vim 中执行安装：
+
+```vim
+:PlugInstall
+```
+
+然后在 `.vimrc` 中启用：
+
+```vim
+colorscheme gruvbox
+```
+
+#### 手动安装：方式一（仅复制主题文件）
+
+只需复制 `colors/gruvbox.vim` 一个文件，适合仅需基础配色的场景。
+
+**第 1 步：创建 colors 目录**
+
+```bash
+mkdir -p ~/.vim/colors
+```
+
+**第 2 步：下载 gruvbox 仓库**
+
+```bash
+git clone https://github.com/morhetz/gruvbox.git
+```
+
+仓库结构：
+
+```text
+gruvbox/
+├── autoload/
+├── colors/
+│   └── gruvbox.vim    ← 仅需此文件
+├── README.md
+└── ...
+```
+
+**第 3 步：复制主题文件**
+
+```bash
+cp gruvbox/colors/gruvbox.vim ~/.vim/colors/
+```
+
+**第 4 步：配置 `.vimrc`**
+
+```vim
+set background=dark
+colorscheme gruvbox
+```
+
+重新打开 Vim 即可生效。
+
+#### 手动安装：方式二（完整安装，推荐）
+
+部分功能（如 `:Gruvbox` 命令、兼容性支持）依赖 `autoload/` 目录，因此建议把 `colors/` 和 `autoload/` 都复制到 Vim 运行时路径。
+
+```bash
+cp -r gruvbox/colors ~/.vim/
+cp -r gruvbox/autoload ~/.vim/
+```
+
+安装后的目录结构：
+
+```text
+~/.vim/
+├── autoload/      ← 方式二额外复制
+├── colors/
+│   └── gruvbox.vim
+└── ...
+```
+
+> [!tip]
+> 方式一和方式二的区别仅在于是否复制 `autoload/`。如果只用 `colorscheme gruvbox`，方式一足够；若需要主题提供的额外命令（如 `:Gruvbox`），用方式二。
+
+#### Windows 安装
+
+Windows 下 Vim 的配置目录为 `C:\Users\<用户名>\vimfiles\`（非 `.vim`）。
+
+**第 1 步：创建目录**
+
+```text
+vimfiles\
+└── colors\
+```
+
+**第 2 步：放入主题文件**
+
+将 `gruvbox.vim` 复制到 `vimfiles\colors\` 下：
+
+```text
+C:\Users\<用户名>\
+└── vimfiles
+    └── colors
+        └── gruvbox.vim
+```
+
+**第 3 步：配置 `_vimrc`**
+
+Windows 下 Vim 配置文件为 `C:\Users\<用户名>\_vimrc`：
+
+```vim
+set background=dark
+colorscheme gruvbox
+```
+
+### 13.3.4 验证安装
+
+进入 Vim 执行：
+
+```vim
+:colorscheme gruvbox
+```
+
+- **未报错**：安装成功
+- **报错 `E185: Cannot find color scheme 'gruvbox'`**：主题文件未找到
+
+> [!warning]
+> 若出现 `E185` 错误，按以下顺序排查：
+>
+> 1. 确认 `gruvbox.vim` 在 `~/.vim/colors/`（或 Windows 的 `vimfiles\colors\`）下
+> 2. 确认 `~/.vim`（或 `vimfiles`）在 `runtimepath` 中：`:echo &runtimepath`
+> 3. 确认文件名拼写正确（`gruvbox.vim`，非 `Gruvbox.vim`）
+
+### 13.3.5 颜色支持配置
+
+第三方主题（如 gruvbox）对终端颜色支持有要求，颜色支持不足会导致显示异常。
+
+#### 256 色
+
+```vim
+set t_Co=256
+```
+
+> [!info]
+> 现代 Vim（8.x/9.x）和现代终端通常默认支持 256 色，无需手动设置。
+
+#### True Color（推荐）
+
+True Color 支持 24 位真彩色，是现代主题的最佳选择：
+
+```vim
+set termguicolors
+```
+
+检查 Vim 是否支持 True Color：
+
+```vim
+:echo has('termguicolors')
+```
+
+输出 `1` 表示支持，`0` 表示不支持（需升级 Vim 版本）。
+
+> [!warning]
+> `set termguicolors` 需要**终端模拟器**也支持 True Color。常见支持 True Color 的终端：
+>
+> | 终端 | 支持 True Color |
+> |---|---|
+> | Windows Terminal | 是 |
+> | iTerm2 | 是 |
+> | GNOME Terminal | 是 |
+> | Xshell | 需在设置中开启 |
+> | tmux | 需额外配置 `tmux-256color` |
+
+### 13.3.6 推荐配置示例
+
+#### gruvbox 完整配置
+
+```vim
+" ===== 主题 =====
+set termguicolors
+set background=dark
+colorscheme gruvbox                                                                                                                           
+```
+
+> [!info]
+> **gruvbox 版本说明**：
+>
+> - `morhetz/gruvbox`：最初的经典版本，目前已不积极维护，但传统 Vim 仍可正常使用
+> - `gruvbox-community/gruvbox`：社区维护版本，对新版 Vim 支持更好
+> - `ellisonleao/gruvbox.nvim`：Neovim 专用版本，支持 LSP/Treesitter 高亮
+
+> [!summary]
+> **主题配置核心**
+>
+> - Vim 主题本质是 `colors/` 目录下的 `.vim` 文件
+> - 自带主题用 `:colorscheme <Tab>` 查看，`colorscheme desert` 设置
+> - 第三方主题安装：复制 `colors/` 目录（基础）或 `colors/` + `autoload/`（完整）
+> - ==先 `set background`，再 `colorscheme`==
+> - 第三方主题建议开启 `set termguicolors` 以获得最佳显示效果
 
 ---
 

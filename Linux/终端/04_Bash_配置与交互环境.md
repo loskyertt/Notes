@@ -1091,3 +1091,49 @@ sysinfo() {
 # ============================================================
 [[ -f ~/.bashrc-local ]] && source ~/.bashrc-local
 ```
+
+---
+
+# 6. 推荐的 Bash 扩展
+
+## 6.1 ble.sh
+
+[ble.sh](https://github.com/akinomyoga/ble.sh) 是目前 Bash 最强大的增强插件，可以说是 **把 Bash 变成了 zsh**。
+
+它提供：
+
+* ✅ 命令自动提示（像 zsh 一样灰色提示）
+* ✅ 语法高亮
+* ✅ 历史搜索
+* ✅ Fish 风格补全
+* ✅ 多行编辑
+* ✅ Vi Mode 增强
+* ✅ 更好的 Prompt
+* ✅ Undo/Redo
+
+效果例如：
+
+```bash
+$ git ch▌
+         checkout master
+```
+
+按 `→`（右方向键）或者 `End` 键即可接受提示。
+
+安装（推荐）：
+
+```bash
+git clone --recursive https://github.com/akinomyoga/ble.sh
+cd ble.sh
+make install PREFIX=~/.local
+```
+
+然后：
+
+```bash
+echo 'source ~/.local/share/blesh/ble.sh' >> ~/.bashrc
+```
+
+重新打开终端即可。
+
+后续卸载只需要删除 `.bashrc` 中的 `source ~/.local/share/blesh/ble.sh` 和删除 `~/.local/share/blesh/` 这个目录即可。

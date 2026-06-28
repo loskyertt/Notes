@@ -21,14 +21,12 @@ aliases:
 
 | 主题 | 笔记 |
 |---|---|
-| 终端快捷键、历史命令、tmux | [[01-Linux 终端快捷键与 Shell 快速操作]] |
-| 用户、用户组、sudo | [[02-Linux 用户与用户组管理]] |
-| 文件查看、复制、删除、查找 | [[03-Linux 文件与目录基本操作]] |
-| 文件权限、所有权、umask | [[04-Linux 文件权限与所有权]] |
-| grep、正则、日志过滤 | [[05-Linux grep 文本搜索]] |
-| tar、gzip、zip | [[06-Linux 文件打包与压缩]] |
-| Vim 文本编辑 | [[07-Linux Vim 文本编辑器]] |
-| systemd、systemctl、journalctl | [[08-Linux systemd 与 systemctl 服务管理]] |
+| 用户、用户组、sudo | [[01-Linux 用户与用户组管理]] |
+| 文件查看、复制、删除、查找 | [[02-Linux 文件与目录基本操作]] |
+| 文件权限、所有权、umask | [[03-Linux 文件权限与所有权]] |
+| grep、正则、日志过滤 | [[04-Linux grep 文本搜索]] |
+| tar、gzip、zip | [[05-Linux 文件打包与压缩]] |
+| systemd、systemctl、journalctl | [[06-Linux systemd 与 systemctl 服务管理]] |
 
 > [!summary]
 > 运维的核心不是“记住所有命令”，而是按正确顺序缩小问题范围：**变更 → 状态 → 日志 → 资源 → 依赖 → 网络 → 回滚**。
