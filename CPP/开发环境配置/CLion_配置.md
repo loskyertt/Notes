@@ -13,6 +13,9 @@ aliases:
   - CLion clang-format
 ---
 
+> [!note]
+> [官方参考链接](https://www.jetbrains.com/zh-cn/help/clion/clion-quick-start-guide.html)
+
 # 1. 快捷键
 
 CLion 提供丰富的快捷键体系，以下按使用场景分类整理（默认 **Windows/Linux Keymap**）。
