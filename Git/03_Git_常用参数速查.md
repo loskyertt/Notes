@@ -10,7 +10,7 @@ aliases:
   - Git 常用参数
 ---
 
-# 1. 参数理解原则
+# 1. 参数说明
 
 Git 参数遵循 Unix 风格，但同一个短参数在不同命令里可能完全不同。
 
@@ -22,6 +22,8 @@ Git 参数遵循 Unix 风格，但同一个短参数在不同命令里可能完�
 
 > [!warning]
 > 不存在“Git 中 `-u` 永远代表某个含义”。参数必须放回具体命令中理解。
+
+---
 
 # 2. 高频短参数总览
 
@@ -38,6 +40,8 @@ Git 参数遵循 Unix 风格，但同一个短参数在不同命令里可能完�
 | `-r` | `--remote` | 远程 | 常见于 `branch` |
 | `-i` | `--interactive` | 交互式 | 常见于 `rebase` / `add` |
 | `-v` | `--verbose` | 详细输出 | 常见于诊断 |
+
+---
 
 # 3. `-u` 与 Upstream
 
@@ -106,6 +110,8 @@ git branch --unset-upstream
 
 > [!tip]
 > 分支重命名后，旧 upstream 不会自动变更。若 `git branch -vv` 显示异常，应重新设置 `git branch -u`。
+
+---
 
 # 4. 按命令速查
 

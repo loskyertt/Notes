@@ -25,6 +25,8 @@ Git 初始配置要解决三个问题：
 > [!summary]
 > 日常开发优先使用 **SSH**；临时环境、CI/CD 或 SSH 不可用时再使用 **Personal Access Token**。
 
+---
+
 # 2. 用户身份配置
 
 ## 2.1 全局身份
@@ -59,6 +61,8 @@ git config user.email "project@example.com"
 
 > [!warning]
 > 提交身份会写入 commit 历史。提交前建议用 `git config user.email` 确认当前仓库使用的邮箱。
+
+---
 
 # 3. SSH 认证
 
@@ -167,6 +171,8 @@ git config --global core.sshCommand "C:/PROGRA~1/OpenSSH/ssh.exe"
 
 `PROGRA~1` 是 `Program Files` 的短路径写法，可避免空格带来的解析问题。
 
+---
+
 # 4. Personal Access Token
 
 ## 4.1 PAT 的定位
@@ -224,6 +230,8 @@ git config --global credential.helper "cache --timeout=3600"
 > [!warning]
 > `store` 会把凭证明文写入本机文件。个人可信设备可以使用；共享机器不建议使用。
 
+---
+
 # 5. 远程仓库配置
 
 ## 5.1 查看远程仓库
@@ -272,6 +280,8 @@ git push github main
 git push gitee main
 ```
 
+---
+
 # 6. 配置检查清单
 
 | 检查项 | 命令 |
@@ -281,6 +291,8 @@ git push gitee main
 | 查看 SSH 是否可用 | `ssh -T git@github.com` |
 | 查看远程 URL | `git remote -v` |
 | 查看远程详情 | `git remote show origin` |
+
+---
 
 # 7. 常见问题
 
@@ -318,8 +330,3 @@ git config --global credential.helper
 ```
 
 必要时重新配置凭证存储或清理系统凭证管理器中的旧 token。
-
-# 8. 总结
-
-> [!summary]
-> Git 环境配置的核心是：**提交身份正确、认证方式稳定、远程 URL 明确**。SSH 是日常开发首选；PAT 是 HTTPS 和自动化场景的补充。配置完成后，再进入 [[02_Git_核心模型与日常操作]] 学习日常命令会更顺畅。
