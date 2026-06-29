@@ -621,7 +621,7 @@ filetype plugin indent on   " 文件类型检测
 
 " ===== 编辑体验 =====
 set number                  " 显示行号
-set relativenumber          " 相对行号（配合 5j 等操作）
+"set relativenumber          " 相对行号（配合 5j 等操作）
 set cursorline              " 高亮当前行
 set showmatch               " 高亮匹配括号
 set wildmenu                " 命令行补全菜单
@@ -647,6 +647,7 @@ set fileencodings=utf-8,gbk,gb18030,big5
 set backspace=indent,eol,start  " Backspace 正常删除
 set mouse=a                      " 启用鼠标
 set laststatus=2                 " 始终显示状态栏
+set statusline=%F                " 显示当前文件的绝对路径（Full path）
 
 " ===== 快捷键 =====
 nnoremap <F2> :set number!<CR>                " 按 F2 开启/关闭行号功能
@@ -935,9 +936,7 @@ set termguicolors
 > | Xshell | 需在设置中开启 |
 > | tmux | 需额外配置 `tmux-256color` |
 
-### 13.3.6 推荐配置示例
-
-#### gruvbox 完整配置
+### 13.3.6 gruvbox 完整配置
 
 ```vim
 " ===== 主题 =====
