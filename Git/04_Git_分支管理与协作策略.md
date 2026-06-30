@@ -126,14 +126,93 @@ git switch feature/login   # 再切换
 
 ## 2.3 分支命名规则
 
-| 前缀 | 用途 | 示例 |
-|---|---|---|
-| `feature/` | 新功能 | `feature/login` |
-| `fix/` | Bug 修复 | `fix/issue-101` |
-| `docs/` | 文档 | `docs/api-update` |
-| `refactor/` | 重构 | `refactor/db-layer` |
-| `release/` | 发布准备 | `release/v1.2.0` |
-| `hotfix/` | 紧急线上修复 | `hotfix/crash-on-start` |
+Git 分支命名并没有强制的语法限制，但在团队协作中，混乱的分支命名会导致“分支地狱”，难以查找、难以清理、容易引发冲突。
+
+业界经过多年实践，沉淀出了几套主流且高效的 Git 分支命名规则。通常，一个规范的分支名由**前缀（类型）** + **分隔符** + **简短描述** + **可选的编号**组成。
+
+以下是详细的分支命名规则指南：
+
+```text
+<前缀>/<可选的层级或作用域>-<简短描述>-<可选的Issue编号>
+```
+* **分隔符**：强烈建议统一使用 **短横线 `-`** 作为单词分隔符（不要用下划线 `_` 或空格，因为很多 CLI 工具对空格和下划线支持不佳，比如按 `Tab` 补全会很麻烦）。
+
+### 2.3.1 主干分支命名
+
+这两个分支是整个仓库的基石，必须保持绝对简洁：
+- *主分支**：`main` （GitHub 现已默认从 `master` 改为 `main`，更符合包容性语言规范）。
+- *开发分支**：`develop` 或 `dev`（如果采用 Git Flow 工作流）。
+
+### 2.3.2 常规分支前缀规范
+
+根据不同的工作流，前缀会有所不同：
+
+#### 1. 功能开发
+
+用于开发新功能。
+
+- `feature/user-login`
+- `feature/shopping-cart-v2`
+- `feature/issue-1234-reset-password` （关联任务编号）
+
+#### 2. 缺陷修复
+
+用于修复线上或测试环境的 Bug。
+
+- `bugfix/header-alignment`
+- `bugfix/fix-404-error`
+- *注：有些团队也习惯用 `fix/` 作为前缀。*
+
+#### 3. 紧急修复
+
+从线上分支（如 `main` 或 `tag`）直接拉出来的紧急修复分支，修完后通常要同时合并回 `main` 和 `develop`。
+
+- `hotfix/database-crash`
+- `hotfix/security-patch-20231024`
+
+#### 4. 发布准备
+
+用于版本发布前的打包、提测、修复小 Bug，禁止在此分支开发新功能。
+
+- `release/v1.2.0`
+- `release/2023-q4`
+
+#### 5. 实验性/丢弃性分支
+
+用于尝试新方案、测试某个想法。**这类分支随时可能被删除，命名要体现出“临时”的属性。**
+
+- `experiment/new-ui-framework`
+- `try/refactor-auth-module`
+- `wip/draft-api` (WIP = Work In Progress)
+
+#### 6. 文档与杂项
+
+- `docs/update-readme`
+- `chore/update-dependencies` （杂务：升级依赖、修改配置文件等不改变业务逻辑的提交）
+- `refactor/simplify-utils` （重构：不改变功能，只优化代码结构）
+
+> [!warning] 命名的“铁律”
+> 
+> 1. **禁止使用中文或中文拼音**：会导致跨平台（特别是 Windows 和 Linux 混用时）出现不可预知的乱码问题。
+>    - ❌ `feature/用户登录` 或 `feature/yonghudenglu`
+> 2. **禁止使用特殊符号**：如 `~`, `^`, `:`, `?`, `*`, `空格` 等，Git 底层对某些字符有特殊解析。
+> 3. **不能以 `-` 开头**：以减号开头会被 Git 命令行解析为命令参数，导致报错。
+> 4. **名称不要太长**：尽量控制在 3-5 个单词以内。分支名会在 `git log --oneline --graph` 中频繁显示，太长会破坏图表的对齐和可读性。
+>    - ❌ `feature/fix-the-very-long-header-alignment-issue-on-mobile-devices`
+>    - ✅ `bugfix/mobile-header-align`
+> 5. **避免使用无意义的名称**：
+>     - ❌ `update`, `test`, `fix`, `my-branch`
+>     - ✅ `feature/add-export-csv`, `bugfix/login-timeout`
+
+### 2.3.3 加入“作用域/模块”
+
+如果你的项目比较庞大，包含多个模块（如前端、后端、不同的微服务），强烈建议在描述前加上**模块名（作用域）**：
+
+- `feature/user-module/sms-login`
+- `bugfix/payment-gateway/timeout-error`
+- `refactor/api/v2-endpoints`
+
+这样做的好处是：当你输入 `git checkout feature/user-module/` 然后按 `Tab` 键时，终端会自动列出该模块下所有的功能分支，查找极其方便。
 
 > [!tip]
 > 统一前缀能让 Git GUI、GitHub、GitLab 更好地折叠和归类分支。
