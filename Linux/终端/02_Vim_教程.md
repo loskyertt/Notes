@@ -650,12 +650,14 @@ set laststatus=2                 " 始终显示状态栏
 set statusline=%F                " 显示当前文件的绝对路径（Full path）
 
 " ===== 快捷键 =====
+nnoremap <F1> :nohlsearch<CR><Esc>            " 按 F1 键关闭搜索高亮
 nnoremap <F2> :set number!<CR>                " 按 F2 开启/关闭行号功能
 nnoremap <F3> :set relativenumber!<CR>        " 按 F3 开启/关闭相对行号功能
 ```
 
 > [!tip]
-> `set relativenumber` 配合 `5j`、`10k` 等数字移动非常高效——当前行显示 0，上下行显示相对距离，一眼就知道要跳几行。
+> 1. `set relativenumber` 配合 `5j`、`10k` 等数字移动非常高效——当前行显示 0，上下行显示相对距离，一眼就知道要跳几行。
+> 2. 如果 vim 版本过低，设置 `ESC` 键为其他功能映射，可能会导致卡顿，建议设置其它键。
 
 ## 13.3 主题配置
 
@@ -923,7 +925,7 @@ set termguicolors
 :echo has('termguicolors')
 ```
 
-输出 `1` 表示支持，`0` 表示不支持（需升级 Vim 版本）。
+输出 `1` 表示支持，`0` 表示不支持（需**升级 Vim 版本**）。
 
 > [!warning]
 > `set termguicolors` 需要**终端模拟器**也支持 True Color。常见支持 True Color 的终端：
