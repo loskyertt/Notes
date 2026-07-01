@@ -299,7 +299,7 @@ alignof(BigObject)  // 64
 > 3. **假设 `sizeof == alignof`**：仅在主流平台部分类型上成立，跨平台不可依赖。
 > 4. **以为 `alignof` 可设置对齐**：`alignof` 只读查询；设置对齐应使用 `alignas`。
 > 5. **忽略结构体尾部 padding**：若最大成员 `alignof` 为 `N`，则结构体 `sizeof` 会被向上取整到 `N` 的倍数。
-> 6. **硬编码对齐值**：写死 `8` / `16` 会丧失可移植性，应使用 `alignof(T)` 或 `alignof(std::max_align_t)`。
+> 6. **硬编码对齐值**：写死 `8` / `16` 会丧失可移植性，应使用 `alignof(T)` 或 `alignof(std::max_align_t)`。`std::max_align_t` 是标准库提供的一个特殊类型，它拥有“普通类型中最大的对齐要求”。
 
 ---
 
