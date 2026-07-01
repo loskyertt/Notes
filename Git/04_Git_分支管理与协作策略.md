@@ -389,136 +389,250 @@ feature/payment ← 未合并，-d 会拒绝，-D 才能删
 
 ---
 
-# 3. 合并策略
+# 3. 分支合并
 
 > [!abstract]
-> 合并本质上是把“两条开发线的工作”整合到一起，但整合的**方式**不同，产生的历史形态也不同。
+> 合并本质上是把“两条开发线的工作”整合到一起，但整合的方式不同，产生的历史形态也不同。
 
-## 3.1 三种合并方式
+## 3.1 合并的拓扑分类
 
-| 方式 | 命令 | 历史形态 | 是否重写提交 | 适用场景 |
-|---|---|---|---|---|
-| Fast-forward | `git merge feature` | 线性 | 否 | 主分支无新提交 |
-| No-ff merge | `git merge --no-ff feature` | 保留分支节点 | 否 | 团队协作、保留功能边界 |
-| Rebase | `git rebase main` | 线性 | 是 | 个人分支整理 |
+Git 在执行 `git merge` 时，首先寻找两个分支的 **merge-base**（最近共同祖先），然后根据 HEAD、目标分支与 merge-base 的关系决定合并方式。
 
-下面以合并 feature/login 分支到 main 分支为例：
+### 3.1.1 Fast-Forward（快进合并）
 
-```bash
-# 1. 合并之前先切换回 main
-git switch main
-
-# 2. 执行合并
-git merge feature/login
-```
-
-## 3.2 Fast-forward（快进合并）
-
-**触发条件**：main 分支在 feature 分支创建后**没有任何新提交**，两者是纯线性关系。
+**条件**：当前分支（HEAD）是目标分支的祖先，即当前分支自分支点后没有新提交。
 
 ```text
 合并前：
-main:    A---B
-              ↖ feature 从这里分出去
-feature:        C---D
-              
-此时 main 和 feature 之间没有“分叉”，
-main 只是落后于 feature，Git 直接移动指针即可。
+  main:     A---B
+                   ↖ feature 从 B 分出
+  feature:         C---D
 
-合并后：
-main:    A---B---C---D
-                      ↑
-                  main 指针直接移动到 D
+合并后（git merge feature）：
+  main:     A---B---C---D
+                        ↑
+               main 指针直接移动到 D
 ```
 
-feature 分支的提交**直接成为 main 的一部分**，没有产生任何新的提交，历史完全线性。缺点是事后看历史，完全看不出 C、D 是在一个独立的 feature 分支上开发的。
+Git 只需将 main 指针向前移动到 feature 的最新提交，**不产生新的 merge commit**，历史完全线性。
 
-## 3.3 No-ff Merge（非快进合并）
+> [!tip]
+> Fast-forward 名称很形象：指针“快进”到目标位置，无需绕路。但事后无法从线性历史中看出 C、D 曾在独立分支上开发。
 
-即使满足 fast-forward 条件，也**强制生成一个 merge commit**。
+### 3.1.2 Three-Way Merge（三方合并）
 
+**条件**：当前分支和目标分支在 merge-base 之后**都有新提交**，历史形成分叉。
+
+```text
 合并前：
-
-```
-main:    A---B
-feature:     C---D
-```
-
-执行：
-
-```bash
-git merge --no-ff feature/login -m "merge: feature/login"
+  main:     A---B---C---D
+                \
+  feature:       E---F
 ```
 
+Git 比较三方文件状态（**merge-base B**、HEAD D、feature F），B 是两个分支的共同祖先，自动合并差异，成功后生成一个 **merge commit**：
+
+```text
 合并后：
-
-```
-main:    A---B-----------M   ← M 是新生成的 merge commit
-              ↖         ↗
-feature:       C---D
-```
-
-M 这个 merge commit 清楚地记录了：
-
-- 这里有一条 feature 分支被合入
-- 合入的时间节点
-- 合入的提交信息
-
-事后用 `git log --graph` 能清晰看到分支的完整生命周期。
-
-## 3.4 Rebase（变基）
-
-Rebase 的思路完全不同，它不是“把两条线合并”，而是**把你的提交“搬家”到目标分支的最新位置之后**。
-
-rebase 前：
-
-```
-main:          A---B---E---F   ← main 有了新提交 E、F
-feature:       A---B---C---D   ← feature 从 B 分出去
+                E---F
+              /      \
+  A---B---C---D------G
+                     ↑
+               merge commit (G)
 ```
 
-在 feature 分支上 rebase：
+三方合并涉及三个快照的比对。若 Git 无法自动合并（如两边修改了同一区域），则进入冲突解决流程（详见第 4 节）。
+
+### 3.1.3 Already Up-to-date（无需合并）
+
+**条件**：目标分支是当前分支的祖先，即目标分支的所有提交已包含在当前分支中。
+
+```text
+  main:    A---B---C
+  feature: A---B
+```
+
+执行 `git merge feature` 时，Git 发现无需任何操作，输出：
+
+```
+Already up to date.
+```
+
+> [!note]
+> 这个边界情况常被忽略，但理解它对全面掌握 merge 行为很重要。从拓扑关系看，merge 的所有情形是 merge-base 与 HEAD、目标分支三者关系的三种排列。
+
+> [!summary] 三种拓扑情形总结
+>
+> | 分支关系 | Git 行为 | 是否生成 Merge Commit |
+> |---|---|---|
+> | HEAD 与 merge-base 重合（HEAD 落后） | Fast-Forward | 否 |
+> | 目标分支与 merge-base 重合（目标落后） | Already up-to-date | 否 |
+> | 两者与 merge-base 均不重合 | Three-Way Merge | 是 |
+
+## 3.2 合并策略选项
+
+上述拓扑关系决定了 Git **能否** fast-forward，以下策略选项决定了合并时 Git **是否**创建 merge commit。
+
+### 3.2.1 `git merge`（默认策略）
 
 ```bash
-git switch feature/login
+git merge feature
+```
+
+Git 自动决定：
+- 能 Fast-Forward 则 FF
+- 不能则 Three-Way Merge 并创建 merge commit
+
+适合日常开发，最常用的方式。
+
+### 3.2.2 `--no-ff`
+
+```bash
+git merge --no-ff feature
+```
+
+即使满足 Fast-Forward 条件，也**强制创建一个 Merge Commit**。
+
+```text
+               C---D
+              /      \
+  A---B---------------M
+                     ↑
+               merge commit (M)
+```
+
+**优点**：
+- 保留功能分支的边界，`git log --graph` 可清晰看到分支生命周期
+- 回滚时可用 `git revert -m 1 M` 撤销整个功能
+
+**缺点**：历史中多出 merge commit 节点。
+
+### 3.2.3 `--ff-only`（不要快进）
+
+```bash
+git merge --ff-only feature
+```
+
+要求必须能 Fast-Forward，否则拒绝合并：
+
+```
+fatal: Not possible to fast-forward
+```
+
+适用于要求线性历史的项目，或 CI 自动合并场景。
+
+### 3.2.4 `--no-commit`（不要自动提交）
+
+合并完成后**不自动生成 commit**，让你有机会在提交前再检查、修改一下合并结果。
+
+```bash
+git merge --no-commit feature
+```
+
+正常 merge 流程：
+
+```
+执行 merge → 自动检测无冲突 → 冲突解决完成后，自动生成 merge commit（一步到位）
+```
+
+加了 `--no-commit` 之后：
+
+```
+执行 merge → 文件已经合并好放在工作区和暂存区 → 停在这里，等你确认
+              ↓
+         你可以再修改文件、调整内容
+              ↓
+         git add . 
+         git commit              ← 手动提交，才算完成
+```
+
+常见用途：合并后想先跑一遍测试、检查一下合并结果是否符合预期，再决定是否真正提交。
+
+> 注意：`--no-commit` 经常和 `--no-ff` 搭配使用，因为如果能 fast-forward，`--no-commit` 也不会生效（因为快进根本不产生 commit）。
+
+```bash
+git merge --no-ff --no-commit feature/login
+# 检查一下...
+git commit -m "merge: feature/login"
+```
+
+如果中途反悔，可以：
+
+```bash
+git merge --abort
+```
+
+## 3.3 Rebase（变基）
+
+Rebase 不是合并，但能达到整合代码的目的，且产生线性的历史。
+
+### 3.3.1 工作原理
+
+Rebase 将当前分支的提交"移植"到目标分支的最新位置之后：
+
+```text
+rebase 前：
+  main:     A---B---E---F
+  feature:  A---B---C---D
+```
+
+```bash
+git switch feature
 git rebase main
 ```
 
-> `git rebase main` 的意思是：**以 main 为新的基点，把当前分支（feature/login）的提交接在 main 分支的后面。**
-
+```text
 rebase 后：
-
-```
-main:          A---B---E---F
-                            ↖
-feature:                    C'---D'   ← feature 指针在这里
+  main:     A---B---E---F
+                         ↖
+  feature:                 C'---D'
 ```
 
-此时 main 还停在 F，需要：
+C → C'、D → D'，**commit hash 已改变**（内容相同，但父提交变了）。
+
+此时再执行 Fast-Forward 合并：
 
 ```bash
 git switch main
-git merge feature/login     ← 因为是线性关系，触发 fast-forward
+git merge feature
 ```
 
-最终：
+最终历史：
 
+```text
+  A---B---E---F---C'---D'
 ```
-main:          A---B---E---F---C'---D'   ← main 指针移动到 D'
-```
 
-注意 C 变成了 C'，D 变成了 D'，**commit hash 变了**，这是全新的提交，只是内容和原来一样。原来的 C、D 被丢弃。结果是 feature 分支看起来像是“从 F 之后才开始开发的”，历史完全线性，非常整洁。
+无 merge commit，历史完全线性。
 
-> [!danger] Rebase 的危险性
+### 3.3.2 适用场景
+
+- **个人分支整理**：推送前用 rebase 整理本地提交，保持历史整洁
+- **追求线性历史的项目**：`git log` 更易阅读
+
+### 3.3.3 重要限制
+
+> [!danger]
+> Rebase 会重写提交历史，**切勿对已推送到公共仓库的分支执行 rebase**。
 >
-> 因为 rebase 会重写 commit hash，所以：
-> 
+> ```text
+> rebase 前已推送：  origin/feature: A---B---C---D
+> rebase 后本地：    feature:        A---B---E---F---C'---D'
+>                           提交 hash 已改变 ↑↑
 > ```
-> 你 rebase 前推送过：  origin/feature: A---B---C---D
-> 你 rebase 后本地：    feature:        A---B---E---F---C'---D'
-> ```
-> 
-> 此时 push 会被拒绝，必须使用` push --force`。同事如果也在这个分支上工作，他的历史就和你的对不上了，pull 时会产生混乱的冲突。所以规则很简单：**只对自己本地的、还没推送的提交 rebase；已推送到公共分支的提交，永远不要 rebase。**
+>
+> - 再次 push 必须使用 `--force`
+> - 协作者 pull 时会产生混乱冲突
+> - **原则**：只 rebase 本地的、未推送的提交
+
+## 3.4 综合对比
+
+| 策略 | 是否保留 Merge Commit | 是否重写历史 | 历史形态 | 适用场景 |
+|---|---|---|---|---|
+| `git merge`（默认） | 自动决定 | 否 | 自动 | 日常开发 |
+| `git merge --no-ff` | 总是保留 | 否 | 分支拓扑清晰 | 团队协作、保留功能边界 |
+| `git merge --ff-only` | 不保留 | 否 | 线性 | 要求线性历史 |
+| `git rebase` + `git merge` | 通常不保留 | 是（rebase 阶段） | 完全线性 | 个人分支整理 |
 
 ---
 
