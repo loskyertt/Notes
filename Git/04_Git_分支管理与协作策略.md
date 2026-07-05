@@ -13,7 +13,7 @@ aliases:
 
 # 1. 分支的核心概念
 
-Git 分支本质上是指向某个 commit 的可移动指针。创建分支并不会复制整个项目，只是创建一个新的引用。
+Git 分支本质上是指向某个 commit 的可移动指针。创建分支并不会复制整个项目，只是创建一个新的**引用**。
 
 ```mermaid
 flowchart LR
@@ -26,6 +26,23 @@ flowchart LR
 
 > [!summary]
 > 分支用于隔离不同开发线：新功能、Bug 修复、发布准备、实验代码都可以放在独立分支中完成。
+
+||本地 `HEAD`|`remotes/origin/HEAD`|
+|---|---|---|
+|**代表什么**|你当前在哪个分支|远端仓库的默认分支是哪个|
+|**由什么决定**|你执行 `git switch` 切换|远端仓库在平台上配置的默认分支|
+|**会随你切换分支变化吗**|✅ 会|❌ 不会|
+
+> [!exmaple]
+> 比如 `remotes/origin/HEAD -> origin/main`，这表示远端仓库（GitHub/Gitee 等平台）上配置的**默认分支是 main**，是平台级别的设置，和你本地在哪个分支完全没有关系。
+>
+> ```
+> 本地：
+> HEAD -> feature/object-pool    ← 你当前在 feature 分支（* 号标注的那行）
+> 
+> 远端：
+> origin/HEAD -> origin/main     ← 远端的默认分支是 main，这是远端自己的配置
+> ```
 
 ---
 
