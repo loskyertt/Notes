@@ -650,9 +650,10 @@ set laststatus=2                 " 始终显示状态栏
 set statusline=%F                " 显示当前文件的绝对路径（Full path）
 
 " ===== 快捷键 =====
-nnoremap <F1> :nohlsearch<CR><Esc>            " 按 F1 键关闭搜索高亮
-nnoremap <F2> :set number!<CR>                " 按 F2 开启/关闭行号功能
-nnoremap <F3> :set relativenumber!<CR>        " 按 F3 开启/关闭相对行号功能
+nnoremap <F1> :nohlsearch<CR>                 " 正常模式：按 F1 键关闭搜索高亮
+nnoremap <F2> :set number!<CR>                " 正常模式：按 F2 开启/关闭行号功能
+nnoremap <F3> :set relativenumber!<CR>        " 正常模式：按 F3 开启/关闭相对行号功能
+set pastetoggle=<F4>                          " 插入模式：按 F4 开启/关闭 paste 功能
 ```
 
 > [!tip]
