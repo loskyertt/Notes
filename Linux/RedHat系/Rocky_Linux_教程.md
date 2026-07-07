@@ -53,9 +53,47 @@ Rocky Linux 属于 Red Hat 系，与 Debian 系在包管理、仓库组织和默
 > [!summary]
 > 学 Rocky Linux 的重点不是只学命令替换，而是理解 RHEL 系的工程习惯：**RPM 包体系、DNF 事务、模块化仓库、SELinux、firewalld、systemd 服务管理**。
 
+## 1.3 最终系统形态
+
+推荐安装完成后的系统形态如下：
+
+| 项目 | 建议状态 | 说明 |
+|---|---|---|
+| 桌面环境 | 不安装 | 保持服务器环境简洁，减少资源占用 |
+| SSH Server | 安装并启用 | 方便远程登录、VS Code Remote SSH、文件传输 |
+| Base Environment | Minimal Install | 最接近云服务器和企业最小化服务器环境 |
+| 开发工具链 | 安装后手动配置 | 通过 `dnf group install "Development Tools"` 按需补齐 |
+| 软件源 | 优先官方仓库 | BaseOS、AppStream、Extras 是基础，CRB / EPEL 按需启用 |
+| 安全机制 | SELinux 与 firewalld 保持启用 | 学习 RHEL 系运维时应理解安全机制，而不是直接关闭 |
+
+> [!summary]
+> Rocky Linux Server 的核心思路是：**安装阶段保持最小化，初始化阶段用 DNF 按需补齐工具链，同时保留 RHEL 系默认安全机制**。这样既贴近真实服务器环境，也便于学习 RPM、DNF、SELinux、firewalld 和 systemd。
+
 # 2. 安装镜像选择
 
-## 2.1 常见镜像类型
+## 2.1 镜像仓库
+
+> [!note]
+> 点击直达：[Rocky Linux 官方下载页](https://rockylinux.org/download)
+> 点击直达：[Rocky Linux 官方镜像列表](https://mirrors.rockylinux.org/)
+> 点击直达：[南京大学 MirrorZ Rocky Linux 软件源](https://help.mirror.nju.edu.cn/rocky/)
+
+Rocky Linux 官方下载页会提供多个版本、架构和镜像类型。对于 VMware 中的普通服务器安装，通常只需要关注 `x86_64` 架构下的安装 ISO。
+
+常见文件名大致类似：
+
+```text
+Rocky-9.x-x86_64-minimal.iso
+Rocky-9.x-x86_64-dvd.iso
+Rocky-9.x-x86_64-boot.iso
+```
+
+选择时优先看两个条件：
+
+- 是否需要离线安装更多软件包。
+- 安装阶段的网络是否稳定。
+
+## 2.2 常见镜像类型
 
 Rocky Linux 提供多种镜像，目标场景不同：
 
@@ -69,7 +107,10 @@ Rocky Linux 提供多种镜像，目标场景不同：
 | Live Image | 桌面体验或临时系统 | 不推荐服务器安装 |
 | WSL Image | Windows WSL 环境 | 不适合 VMware |
 
-## 2.2 Minimal ISO 与 DVD ISO
+> [!warning]
+> 初学阶段不要把 Cloud Image、Container Image、WSL Image 当作普通安装 ISO。它们面向的是云平台、容器或 WSL，不是 VMware 交互式安装。
+
+## 2.3 Minimal ISO 与 DVD ISO
 
 如果目标是在 VMware 中搭建无桌面的服务器学习环境，优先选择：
 
@@ -92,7 +133,7 @@ Rocky-*-x86_64-dvd.iso
 
 DVD ISO 体积更大，但离线能力更强。它不是“更臃肿”的同义词，最终系统是否简洁仍取决于安装时选择的软件环境。
 
-## 2.3 Boot ISO 的使用条件
+## 2.4 Boot ISO 的使用条件
 
 Boot ISO 只包含启动安装器所需的最小内容，安装过程中必须从网络仓库下载软件包。
 
@@ -108,8 +149,8 @@ Boot ISO 只包含启动安装器所需的最小内容，安装过程中必须�
 - 网络代理、DNS、镜像源配置不确定。
 - 希望离线或半离线完成安装。
 
-> [!warning]
-> 初学阶段不要把 Cloud Image、Container Image、WSL Image 当作普通安装 ISO。它们面向的是云平台、容器或 WSL，不是 VMware 交互式安装。
+> [!tip]
+> 如果只是搭建一台长期学习用的 Rocky Linux Server，优先选择 **Minimal ISO**。如果网络不稳定，选择 **DVD ISO** 会更稳妥。
 
 # 3. VMware 虚拟机配置
 
@@ -294,6 +335,51 @@ Troubleshooting 是故障排查入口，通常用于：
 
 正常安装不需要进入该菜单。
 
+## 5.5 Anaconda 安装器关键选项
+
+Rocky Linux 使用 Anaconda 安装器。进入安装界面后，服务器安装最需要关注以下几项：
+
+| 选项 | 建议 | 说明 |
+|---|---|---|
+| Installation Destination | 手动确认磁盘与分区 | 避免误装到错误磁盘 |
+| Software Selection | Minimal Install | 决定最终是否为无桌面服务器 |
+| Network & Host Name | 启用网卡并设置主机名 | 便于安装后直接使用网络和 SSH |
+| Root Password | 可设置，也可禁用 root SSH 登录 | 学习环境可保留 root 密码，但日常优先用 sudo |
+| User Creation | 创建普通用户并勾选管理员权限 | 让普通用户加入 `wheel` 组获得 sudo 权限 |
+| Time & Date | 设置时区 | 建议选择 Asia/Shanghai 或实际所在时区 |
+
+> [!warning]
+> **Software Selection** 是决定系统形态的关键步骤。选择 `Server with GUI` 或 `Workstation` 会安装桌面环境；如果目标是无桌面服务器，应选择 `Minimal Install`。
+
+## 5.6 Software Selection
+
+Rocky Linux 安装器中的 **Software Selection** 通常包含两类内容：
+
+```text
+Base Environment
+Add-ons for Selected Environment
+```
+
+服务器学习环境推荐：
+
+```text
+Base Environment: Minimal Install
+Add-ons: 默认不勾选，安装后按需使用 DNF 安装
+```
+
+常见 Base Environment 含义如下：
+
+| Base Environment | 含义 | 是否推荐 |
+|---|---|---|
+| Minimal Install | 最小化服务器系统 | 推荐 |
+| Server | 安装更多服务器组件 | 可用，但不如 Minimal 简洁 |
+| Server with GUI | 带图形界面的服务器 | 不推荐无桌面服务器 |
+| Workstation | 桌面工作站环境 | 不推荐服务器学习环境 |
+| Custom Operating System | 自定义基础环境 | 熟悉后再使用 |
+
+> [!summary]
+> Rocky Linux 安装阶段的关键不是“装得越多越好”，而是先得到一个干净的 Minimal 系统，再通过 DNF 明确安装自己需要的软件包和软件组。
+
 # 6. 分区建议
 
 ## 6.1 学习环境推荐分区
@@ -415,6 +501,47 @@ sudo dnf update
 - DNF 仓库是否启用。
 - 当前用户是否有 sudo 权限。
 
+## 7.4 sudo 权限配置
+
+Rocky Linux 默认使用 `wheel` 组管理 sudo 权限。安装阶段如果在 **User Creation** 中勾选了管理员权限，普通用户通常已经被加入 `wheel` 组。
+
+检查当前用户所属组：
+
+```bash
+groups
+```
+
+检查指定用户所属组，例如用户名为 `sky`：
+
+```bash
+groups sky
+```
+
+如果用户不在 `wheel` 组，可以切换到 root 后添加：
+
+```bash
+su -
+usermod -aG wheel sky
+```
+
+退出当前登录会话后重新登录，再检查：
+
+```bash
+groups
+sudo whoami
+```
+
+如果 `sudo whoami` 输出：
+
+```text
+root
+```
+
+说明 sudo 权限正常。
+
+> [!warning]
+> `usermod -aG wheel sky` 中的 `-aG` 不要写错。`-a` 表示追加用户组，`-G` 表示设置附加组。如果漏掉 `-a`，可能覆盖用户原有附加组。
+
 # 8. RPM 与 DNF 包管理体系
 
 ## 8.1 分层结构
@@ -422,54 +549,147 @@ sudo dnf update
 Rocky Linux 使用 RPM 包管理体系，日常使用 `dnf`，底层由 `rpm` 完成实际软件包操作。
 
 ```text
-用户常用命令
-────────────────────
-dnf / yum
-────────────────────
-libdnf / hawkey / solv
-────────────────────
-rpm
-────────────────────
-.rpm 软件包文件
++---------------------------------------------+
+|        用户层：dnf / yum / repoquery          |
++---------------------------------------------+
+|       DNF 软件包管理系统（依赖解析、事务）      |
++---------------------------------------------+
+|                  rpm（本地包操作）             |
++---------------------------------------------+
+|                 .rpm 软件包文件格式            |
++---------------------------------------------+
 ```
 
-其中：
+各层职责划分：
 
-- `.rpm` 是 Red Hat 系软件包文件格式。
-- `rpm` 负责本地包安装、卸载、查询和校验。
-- `dnf` 负责仓库、依赖解析、事务生成、下载和调用 `rpm`。
-- `yum` 在新版本 Rocky Linux 中主要作为兼容入口，底层通常指向 DNF。
+| 层级 | 名称 | 职责 | 是否联网 |
+|---|---|---|---|
+| 文件层 | `.rpm` | Red Hat 系软件包文件格式，包含二进制、配置、脚本和元信息 | — |
+| 底层工具 | `rpm` | 本地安装、卸载、查询、校验 RPM 包 | 否 |
+| 管理系统 | DNF | 软件源管理、元数据下载、依赖解析、事务生成、调用 `rpm` | 是 |
+| 前端命令 | `dnf` / `yum` / `repoquery` | 面向用户或脚本的命令入口 | 通常是 |
+
+> [!summary]
+> ==DNF 不是 rpm 的替代品，而是 rpm 的上层依赖管理系统==。所有 DNF 安装、卸载和升级操作最终都会进入 RPM 数据库。
 
 ## 8.2 rpm
 
-`rpm` 是底层工具，适合查询本地包信息：
+`rpm` 是 **RPM Package Manager** 的缩写，是 Rocky Linux 包管理体系的底层工具，直接操作本地 RPM 数据库和 `.rpm` 文件。
+
+### 8.2.1 查询已安装软件包
 
 ```bash
+# 列出所有已安装软件包
 rpm -qa
+
+# 查看指定包是否安装
+rpm -q bash
+
+# 查看指定包详细信息
 rpm -qi bash
+
+# 查看指定包安装了哪些文件
+rpm -ql bash
+
+# 查询某个文件属于哪个包
 rpm -qf /usr/bin/bash
 ```
 
-常见用途：
+常用查询选项：
 
-| 命令 | 作用 |
+| 选项 | 作用 |
 |---|---|
-| `rpm -qa` | 列出已安装软件包 |
-| `rpm -qi bash` | 查看指定包信息 |
-| `rpm -ql bash` | 查看包安装了哪些文件 |
-| `rpm -qf /usr/bin/bash` | 查询某个文件属于哪个包 |
+| `-q` | query，查询指定软件包 |
+| `-qa` | query all，列出所有已安装软件包 |
+| `-qi` | 显示软件包详细信息 |
+| `-ql` | 列出软件包安装的文件 |
+| `-qf` | 查询某个文件归属的软件包 |
+| `-V` | 校验已安装文件是否被修改 |
+| `-e` | erase，卸载软件包 |
+
+### 8.2.2 安装与卸载本地 RPM
 
 `rpm` 可以直接安装本地 RPM 包：
 
 ```bash
+# 安装本地 RPM 包
 sudo rpm -ivh package.rpm
+
+# 升级或安装本地 RPM 包
+sudo rpm -Uvh package.rpm
+
+# 卸载软件包
+sudo rpm -e package-name
 ```
 
-但它不会像 DNF 那样自动从仓库解析并下载依赖。因此日常安装软件应优先使用 `dnf`。
+常见安装选项：
+
+| 选项 | 作用 |
+|---|---|
+| `-i` | install，仅安装新包 |
+| `-U` | upgrade，升级；未安装时也会安装 |
+| `-F` | freshen，仅升级已安装的软件包 |
+| `-v` | 显示详细信息 |
+| `-h` | 显示安装进度条 |
+| `-e` | 卸载软件包 |
+
+### 8.2.3 依赖缺失与修复
+
+`rpm` 不会自动从仓库下载依赖，因此直接安装外部 RPM 包时可能报错：
+
+```text
+error: Failed dependencies:
+        libfoo.so.1()(64bit) is needed by package-name
+```
+
+这种情况下不要盲目使用 `--nodeps` 强行安装。更推荐交给 DNF 解析依赖：
+
+```bash
+sudo dnf install ./package.rpm
+```
+
+> [!warning]
+> `rpm --nodeps` 会跳过依赖检查，可能造成软件能安装但无法运行，甚至破坏后续升级链。普通学习和开发环境应优先使用 `dnf install ./xxx.rpm`。
+
+### 8.2.4 rpm 的特点
+
+- 可以直接查询本地 RPM 数据库，速度快。
+- 可以查询文件归属和软件包安装清单。
+- 可以安装本地 `.rpm` 文件，但**不会自动下载依赖**。
+- 适合离线排查、本地包校验、文件归属查询。
 
 ## 8.3 dnf
 
 `dnf` 是 Rocky Linux 日常包管理首选工具。
+
+### 8.3.1 DNF 工作流程
+
+DNF 执行一次安装时的典型流程如下：
+
+```mermaid
+graph TD
+    A[dnf makecache / dnf install] --> B[读取 /etc/yum.repos.d/*.repo]
+    B --> C[下载 Repository Metadata]
+    C --> D[解析依赖与模块流]
+    D --> E[生成事务 Transaction]
+    E --> F[下载 RPM 包]
+    F --> G[GPG 签名校验]
+    G --> H[调用 rpm 完成安装]
+    H --> I[执行脚本、刷新缓存、处理 SELinux 上下文]
+```
+
+### 8.3.2 DNF 的核心职责
+
+| 职责 | 说明 |
+|---|---|
+| 读取仓库配置 | 解析 `/etc/yum.repos.d/*.repo` |
+| 下载元数据 | 获取软件包列表、依赖关系、模块流信息 |
+| 依赖解析 | 自动计算安装、升级或移除的依赖链 |
+| 事务管理 | 生成可查看、可部分回滚的 history 记录 |
+| 下载和校验包 | 下载 RPM 包并进行 GPG 签名校验 |
+| 调用 rpm | 交由 `rpm` 完成实际安装、卸载和数据库更新 |
+
+### 8.3.3 常用命令
 
 常用命令：
 
@@ -489,6 +709,50 @@ DNF 的关键能力：
 - 支持 GPG 签名校验。
 - 支持仓库优先级、插件和模块流。
 
+### 8.3.4 使用 DNF 安装本地 RPM
+
+现代 Rocky Linux 推荐使用 DNF 安装本地 RPM 包：
+
+```bash
+sudo dnf install ./package.rpm
+```
+
+相比 `rpm -ivh package.rpm`，这种方式的优势是：
+
+- 自动从已启用仓库中寻找依赖。
+- 安装过程进入 DNF history，便于后续查看和回滚。
+- 保持与日常包管理方式一致。
+
+> [!warning]
+> `./` 不建议省略。写成 `dnf install package.rpm` 时，DNF 可能按包名或当前路径解析，容易造成理解混乱。使用 `./package.rpm` 可以明确告诉 DNF：这是本地文件。
+
+### 8.3.5 rpm 与 DNF 的互通性
+
+> [!question]
+> 通过 `rpm -ivh` 安装的软件包，可以用 `dnf remove` 卸载吗？
+
+**结论**：==可以==。无论软件包通过 `rpm` 还是 `dnf` 安装，最终都会登记到同一个 RPM 数据库中。
+
+Rocky Linux 中已安装软件包信息由 RPM 数据库维护，DNF 只是上层管理工具：
+
+```mermaid
+graph LR
+    A[rpm -ivh xxx.rpm] --> D[(RPM 数据库)]
+    B[dnf install xxx] -->|内部调用 rpm| D
+    C[dnf remove xxx] -->|生成事务后调用 rpm| D
+    E[rpm -e xxx] --> D
+```
+
+关键事实：
+
+- `dnf install` 最终会调用 RPM 相关机制完成安装。
+- `dnf remove` 会根据 RPM 数据库判断软件包状态。
+- `rpm -qa` 能看到所有已安装 RPM 包，不关心安装来源。
+- ==包的安装来源对普通卸载流程基本透明==。
+
+> [!tip]
+> 可将 RPM 数据库理解为“系统已安装包的唯一真相源”：无论是 `rpm` 装的，还是 `dnf` 装的，都会进入同一个数据库。
+
 ## 8.4 yum
 
 在 Rocky Linux 8/9/10 等新版本中，`yum` 通常作为兼容命令存在：
@@ -500,6 +764,20 @@ dnf
 ```
 
 旧教程、旧脚本、旧运维文档中经常出现 `yum`。新环境建议统一使用 `dnf`，这样更符合当前 RHEL 系工具链。
+
+## 8.5 rpm、dnf 与 yum 选择建议
+
+| 场景 | 推荐工具 | 示例命令 |
+|---|---|---|
+| 日常安装、卸载、升级 | `dnf` | `sudo dnf install git` |
+| 安装本地 RPM 并解析依赖 | `dnf` | `sudo dnf install ./xxx.rpm` |
+| 查询文件属于哪个包 | `rpm` / `dnf provides` | `rpm -qf /usr/bin/bash` |
+| 查询已安装包文件列表 | `rpm` | `rpm -ql bash` |
+| 查看仓库中谁提供某个命令 | `dnf provides` | `dnf provides '*/gcc'` |
+| 兼容旧脚本 | `yum` | `sudo yum install git` |
+
+> [!summary]
+> 日常原则：**能用 DNF 完成安装和升级，就不要直接用 rpm 安装；需要本地查询和文件归属时，rpm 更直接**。
 
 # 9. DNF 软件组与环境组
 
@@ -807,6 +1085,111 @@ sudo dnf history undo <ID>
 
 > [!warning]
 > `dnf history undo` 并不总是能完美回滚。若仓库状态、软件版本或依赖关系已经变化，回滚可能失败或引入新的依赖调整。
+
+## 11.7 版本锁定
+
+如果需要临时防止某个软件包被升级，可以安装版本锁定插件：
+
+```bash
+sudo dnf install 'dnf-command(versionlock)'
+```
+
+锁定指定软件包：
+
+```bash
+sudo dnf versionlock add nginx
+```
+
+查看锁定列表：
+
+```bash
+dnf versionlock list
+```
+
+删除锁定：
+
+```bash
+sudo dnf versionlock delete nginx
+```
+
+清空所有锁定：
+
+```bash
+sudo dnf versionlock clear
+```
+
+> [!warning]
+> 版本锁定适合临时规避兼容性问题，不应长期锁定系统基础包。锁定 `glibc`、`systemd`、`kernel` 等核心包可能导致安全更新无法正常应用。
+
+## 11.8 自动清理
+
+清理不再被需要的依赖：
+
+```bash
+sudo dnf autoremove
+```
+
+清理缓存：
+
+```bash
+sudo dnf clean all
+```
+
+查看 DNF 缓存目录：
+
+```bash
+du -sh /var/cache/dnf
+```
+
+> [!tip]
+> `dnf autoremove` 会基于依赖关系判断孤立包。执行前应阅读将要删除的软件包列表，避免误删仍在手动使用的工具。
+
+## 11.9 常见易错点
+
+> [!warning]
+> 以下是使用 Rocky Linux 包管理工具时的常见错误：
+
+1. **直接用 `rpm -ivh` 安装外部包**
+   - 现象：遇到 `Failed dependencies`，依赖需要手动处理。
+   - 修复：优先使用 `sudo dnf install ./xxx.rpm`。
+
+2. **遇到依赖错误就使用 `--nodeps`**
+   - 现象：软件包被强行安装，但运行时报缺库或后续升级异常。
+   - 修复：启用正确仓库，交给 DNF 解析依赖。
+
+3. **CRB 未启用导致 devel 包找不到**
+   - 现象：安装编译依赖时报 `No match for argument`。
+   - 修复：安装 `dnf-plugins-core` 后启用 CRB。
+
+4. **混淆 `dnf update` 与内核更新后的状态**
+   - 现象：更新后 `uname -r` 仍显示旧内核。
+   - 原因：新内核已安装，但系统尚未重启。
+   - 修复：`sudo reboot` 后再检查。
+
+5. **随意添加第三方仓库**
+   - 现象：依赖来源混杂，升级时产生冲突。
+   - 修复：优先官方仓库，EPEL 按需启用，避免来源不明仓库。
+
+6. **看到版本旧就认为没有安全补丁**
+   - 现象：误以为企业发行版长期不更新。
+   - 原因：RHEL 系大量安全修复通过 Backport 回移。
+   - 修复：结合 Rocky / Red Hat 安全公告判断，而不是只看上游版本号。
+
+## 11.10 工具选型总结
+
+> [!summary]
+> Rocky Linux 包管理工具的选型决策：
+
+| 场景 | 推荐工具 | 推荐命令 |
+|---|---|---|
+| 日常安装、卸载、升级 | DNF | `dnf install` / `dnf remove` |
+| 安装本地 `.rpm` | DNF | `dnf install ./xxx.rpm` |
+| 查询已安装包 | rpm | `rpm -qa` / `rpm -q pkg` |
+| 查询文件归属 | rpm | `rpm -qf /path/to/file` |
+| 查询仓库提供者 | DNF | `dnf provides '*/command'` |
+| 查询事务历史 | DNF | `dnf history` |
+| 版本锁定 | DNF 插件 | `dnf versionlock add pkg` |
+| 兼容旧文档 | yum | `yum install pkg` |
 
 # 12. Rocky Linux 软件源与仓库
 
