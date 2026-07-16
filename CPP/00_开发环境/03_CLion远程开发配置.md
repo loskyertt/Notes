@@ -349,6 +349,25 @@ CMake:
 Reload CMake Project
 ```
 
+## 6.4 清理 CLion 索引
+
+CLion 远程开发（Remote Development / Remote Toolchain）会在本地维护一份远程环境的索引和缓存，如果在服务端安装了新库，此时 CLion 可能无法自动同步到这些新库的索引和缓存，导致 CLion 头文件报错找不到。此时可以通过**清理 CLion 索引缓存**来解决。
+
+点击**菜单**：
+
+```txt
+File
+ └── Invalidate Caches...
+```
+
+![[imgs/03_CLion远程开发配置/07.png]]
+
+勾选上下图中的两个选项：
+
+![[imgs/03_CLion远程开发配置/08.png]]
+
+使其失效并重启 CLion 后，一般就能解决。
+
 ---
 
 # 7. 最佳实践
