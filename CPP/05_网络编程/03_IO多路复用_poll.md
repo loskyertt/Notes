@@ -1,9 +1,10 @@
-> [!abstract] 实际上 `poll` 的机制与 `select` 类似，与 `select` 在本质上没有多大差别，使用方法也类似。
+> [!abstract]
+> 实际上 `poll` 与 `select` 在本质上没有多大差别，机制和使用方法也是类似的。
 
 # 1. select VS poll
 
 下面的是对于二者的对比：
-- 内核对应文件描述符的检测也是以线性的方式进行轮询，根据描述符的状态进行处理。
+- 内核对应文件描述符的检测都是以**线性**的方式进行轮询，根据描述符的状态进行处理。
 - `poll` 和 `select` 检测的文件描述符集合会在检测过程中频繁的进行用户区和内核区的拷贝，它的开销随着文件描述符数量的增加而线性增大，从而效率也会越来越低。
 - `select` 检测的文件描述符个数上限是 $1024$，`poll` 没有最大文件描述符数量的限制。
 - `select` 可以跨平台使用，`poll` 只能在 Linux 平台使用。
@@ -14,14 +15,17 @@
 | **最大连接数** | **有限制** (默认 1024) | **无限制** (取决于系统资源) |
 | **事件类型** | 读、写、异常 (3 个参数) | 读、写、异常、优先级等 (统一为 flags) |
 | **参数维护** | **需重置** (内核会修改参数) | **无需重置** (仅修改 `revents`) |
-| **跨平台性** | 极好 (Windows/Linux/Mac) | 较好 (Linux/Mac) |
+| **跨平台性** | Windows/Linux/Mac | Linux/Mac |
 | **时间复杂度** | $O(n)$ | $O(n)$ |
 
 > [!note]
 > 从上面的描述不难看出，在实际生产环境中，基本上是不会考虑使用 `poll` 的，因为 `select` 有跨平台性（Windows 上也支持），因此在特定场景下不可替代。而 `poll` 没有跨平台性这个特点，且效率远低于 `epoll`，所以 `poll` 一般也就用在教学中。
 
-# 2. 核心数据结构：“结构体数组”
+---
 
+# 2. poll 的结构体数组
+
+> [!info]
 > `select` 强制使用三个固定长度的位图（`fd_set`），而 `poll` 允许用户传递一个由 `struct pollfd` 组成的**动态数组**。
 
 `struct pollfd` 定义于 `<poll.h>` 中，`poll` 的核心在于实现了**输入输出参数的分离**。
@@ -49,7 +53,7 @@ struct pollfd {
     - **优势**：`select` 会破坏传入的参数，每次循环都需要重新初始化；而 `poll` 只修改 `revents`，`fd` 和 `events` 在循环中保持不变，代码逻辑更简洁。
 
 3.  **统一错误处理**
-    `select` 需要三个独立的集合（读、写、异常）和一个额外的 `exceptfds`；`poll` 将所有事件（包括异常）都统一在 `events`/`revents` 的标志位中，无需单独处理异常集合。
+    `poll` 统一用一套 `events`/`revents` 位掩码机制表达所有关注的事件类型，且错误/挂起类事件由内核自动上报，不需要像 `select` 那样额外传一个语义模糊、实际只用于 OOB 数据检测的 `exceptfds`。
 
 ---
 
@@ -65,7 +69,8 @@ struct pollfd {
 | `POLLHUP` | 对方关闭连接（挂起） | 检测对端是否已关闭（此时通常仍可读数据）。 |
 | `POLLNVAL` | 请求无效（如 fd 未打开） | 检查文件描述符是否合法。 |
 
-> [!tip] 用“或”操作（`|`）表示**组合开关**。
+> [!tip]
+> 用“或”操作（`|`）表示**组合开关**。
 
 `POLLIN` 和 `POLLOUT` 在内核头文件中被定义为不同的二进制位。假设：
 - `POLLIN` 的二进制是 `0000 0001` (十进制 1)
@@ -82,7 +87,8 @@ struct pollfd {
 
 **逻辑含义**：你告诉内核：“我既关心读（第 0 位），也关心写（第 2 位）。” 这个整数现在就像一个**面板**，上面有两个开关都被拨到了“开启”位置。
 
-> [!tip] 用“与”操作（`&`）表示**精准嗅探**
+> [!tip] 
+> 用“与”操作（`&`）表示**精准嗅探**
 
 当 `poll` 返回时，内核会修改 `revents`。由于 `revents` 可能同时包含多个状态（比如既可读又可写，或者报错了），你不能用 `==` 来判断。
 
@@ -152,7 +158,7 @@ flowchart TD
         K3{是否有就绪事件?}
         K4["修改 .revents 字段<br/>(保持 .events 不变)"]
         K5["copy_to_user<br/>(拷贝回用户态)"]
-        K_Sleep[进程进入睡眠/挂起]
+        K_Sleep[进程进入睡眠（挂起）]
     end
 
     %% 流程连接
@@ -178,7 +184,7 @@ flowchart TD
 ```
 
 **关键点**：
-- 当你调用 `poll()` 时，你需要把整个 `pollfd` 数组从你的程序内存（用户态）搬运到操作系统的内存（内核态）；当 `poll()` 返回时，内核还得把改好的结果再搬回来。这是 $O(n)$ 的空间/数据传输开销。
+- 当你调用 `poll()` 时，你需要把整个 `pollfd` 数组从你的程序内存（用户态）拷贝到操作系统的内存（内核态）；当 `poll()` 返回时，内核还得把改好的结果再拷贝回用户态。这是 $O(n)$ 的空间/数据传输开销。
 - 内核在接收到数组后，并不知道哪些 FD 是活跃的。它必须从数组的第 0 个元素开始，一直扫到第 $n-1$ 个元素，逐个检查每个 FD 对应的内核缓冲区（比如 TCP 接收队列）是否有数据。这是 $O(n)$ 的 CPU 时间开销。
 - 在 `pollfd` 结构体中，`events`（你的期待）和 `revents`（内核的结果）是两个不同的字段。内核只会修改 `revents`。这是 `poll` 优于 `select` 的地方。
 	- 在 `select` 中，位图被内核原地覆盖，所以你必须在 `while` 循环里重复 `FD_SET`（步骤很繁琐）。
@@ -191,104 +197,111 @@ flowchart TD
 这个示例展示了 `poll` 相比 `select` 的优势：不需要每次循环都重置关注列表。
 
 ```cpp
-/**
- * @File    :   src/server.cpp
- * @Time    :   2026/04/16 22:08:16
- * @Author  :   loskyertt
- * @Github  :   https://github.com/loskyertt
- * @Desc    :   poll 示例
- */
-
-#include "logger/logger.h"
-#include "socket/server_socket.h"
-#include "socket/socket.h"
-
-#include <bits/types/struct_timeval.h>
-#include <poll.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <algorithm>
+#include <sys/poll.h>
+#include <arpa/inet.h>
 #include <cstring>
-#include <print>
 #include <string>
-
-using namespace sky::socket;
-using namespace sky::utility;
+#include <unistd.h>
+#include <vector>
 
 int main() {
-  // 初始化日志
-  Singleton<Logger>::getInstance().open("log/server.log");
-
-  // 创建服务器监听套接字
-  ServerSocket server("127.0.0.1", 8080);
-  int listen_fd = server.getSocketFd();
-
-  // === 循环等待连接 ===
-  // 数据初始化, 创建自定义的文件描述符集
-  struct pollfd fds[1024];
-  for (int i = 0; i < 1024; ++i) {
-    fds[i].fd = -1;
-    fds[i].events = POLLIN;  // 检测读缓冲区, 委托内核去处理
+  // 1. 创建 socket
+  const int server_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (server_fd < 0) {
+    printf("create socket error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
   }
+  printf("socket create success!\n");
 
-  fds[0].fd = listen_fd;
-  int max_idx = 0;  // 在结构体数组中的目前最大下标是 0
+  // 2. 绑定 socket
+  const std::string ip = "127.0.0.1";
+  const uint16_t port  = 8080;
 
-  // 主事件循环
+  sockaddr_in server_addr     = {};                     // note：C++ 11 起的值初始化，默认初始化为 0
+  server_addr.sin_family      = AF_INET;                // 设置为 IPV4 的地址簇
+  server_addr.sin_addr.s_addr = inet_addr(ip.c_str());  // 地址转换：点分十进制 -> 32 位整数
+  server_addr.sin_port        = htons(port);            // 端口转换：主机字节序 -> 网络字节序
+
+  if (::bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) < 0) {
+    printf("bind error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
+  }
+  printf("bind success!\n");
+
+  // 3. 监听
+  if (::listen(server_fd, 1024) < 0) {
+    printf("listen error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
+  }
+  printf("server listening ...\n");
+
+  // === 以下是 poll 部分 ===
+
+  // 4. 数据初始化
+  std::vector<pollfd> fds;
+  fds.reserve(1024);
+
+  pollfd server_pfd{};
+  server_pfd.fd     = server_fd;
+  server_pfd.events = POLLIN;
+  fds.push_back(server_pfd);
+
+  // 5. 主事件循环
   while (true) {
-    // 调用 poll 等待事件
-    int ret = poll(fds, static_cast<nfds_t>(max_idx) + 1, -1);  // -1 表示永久阻塞，直到有事件发生
-    if (ret < 0) {
-      Log_error("poll error: errno=%d errmsg=%s", errno, strerror(errno));
+    // ===== 等待 I/O 事件 =====
+    int ready_count = poll(fds.data(), fds.size(), -1);  // -1 表示永久阻塞，直到有事件发生
+    if (ready_count < 0) {
+      printf("poll error: errno=%d errmsg=%s\n", errno, strerror(errno));
       break;
     }
+    printf("poll success! ready_count=%d\n", ready_count);
+    // 这里没有设置超时时间，所以不会有返回值为 0 的情况
 
-    // 检查监听套接字是否有事件，第 0 号位置始终对应的是 listen_fd
+    // 检查监听套接字是否有事件，第 0 号位置始终对应的是 server_fd
     if (fds[0].revents & POLLIN) {
-      // 有新连接
-      int conn_fd = server.accept();
-      if (conn_fd < 0) {
-        continue;
-      }
+      int conn_fd = ::accept(server_fd, nullptr, nullptr);
+      if (conn_fd >= 0) {
+        // 找到空闲位置
+        pollfd conn_pfd{};
+        conn_pfd.fd     = conn_fd;
+        conn_pfd.events = POLLIN;
+        fds.push_back(conn_pfd);
 
-      // 找到空闲位置
-      for (int i = 0; i < 1024; ++i) {
-        if (fds[i].fd == -1) {
-          fds[i].fd = conn_fd;
-          max_idx = std::max(max_idx, i);
-          break;
-        }
+        printf("New client connected: conn_fd=%d, fds counts=%ld\n", conn_fd, fds.size());
       }
     }
 
-    // 通信, 有客户端发送数据过来
-    for (int i = 1; i <= max_idx; ++i) {
-      if (fds[i].fd != -1 && (fds[i].revents & POLLIN)) {
-        Socket client_conn(fds[i].fd);
-        client_conn.setNonBlocking();
-        client_conn.setRelease();
+    // 通信：有客户端发送数据过来（跳过第一个 server_fd）
+    for (auto it = fds.begin() + 1; it != fds.end();) {
+      // 有数据可读
+      if (it->revents & POLLIN) {
+        printf("Client data available on fd=%d\n", it->fd);
 
-        // 有数据可读
-        char buffer[1024];
-        ssize_t bytes_read = client_conn.recv(buffer, sizeof(buffer));
-        if (bytes_read == 0) {
-          // 客户端关闭连接
-          Log_info("Client disconnected: fd=%d", fds[i].fd);
-          // 将检测的文件描述符从读集合中删除
-          client_conn.close();  // 手动关闭
-          fds[i].fd = -1;
-        } else if (bytes_read > 0) {
-          std::println("Received {} bytes from fd={}, data={}", bytes_read, fds[i].fd, std::string(buffer));
+        char buf[1024]     = {0};
+        ssize_t bytes_read = ::recv(it->fd, buf, sizeof(buf), 0);
 
+        if (bytes_read > 0) {
+          printf("Received %ld bytes from fd=%d, data=%s\n", bytes_read, it->fd, buf);
           // 向客户端发送数据
-          std::string new_data = "Echo: " + std::string(buffer);
-          client_conn.send(new_data.c_str(), new_data.size());
+          ::send(it->fd, buf, bytes_read, 0);
+          ++it;
         } else {
-          Log_error("recv error: errno=%d errmsg=%s", errno, strerror(errno));
+          if (bytes_read == 0) {
+            printf("Client disconnected: fd=%d\n", it->fd);
+          } else {
+            printf("recv error: errno=%d errmsg=%s\n", errno, strerror(errno));
+          }
+          // 将监测的文件描述符从集合中删除
+          ::close(it->fd);
+          it = fds.erase(it);
         }
+      } else {
+        ++it;
       }
     }
   }
+
+  ::close(server_fd);
 
   return 0;
 }
