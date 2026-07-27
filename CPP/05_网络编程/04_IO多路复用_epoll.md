@@ -1,4 +1,4 @@
-> [!abstract] 
+> [!abstract]
 > `epoll`（Event Poll）是 Linux 内核特有的 I/O 多路复用机制，专为解决 C10K（单机同时处理一万个并发连接）问题而设计。
 > **核心定义**：`epoll` 是一种基于**事件驱动**、利用**回调机制**、在内核态与用户态之间进行高效交互的异步 I/O 通知机制。
 > 相比于 `select` 和 `poll` 的“轮询”模式，`epoll` 采用了“订阅-通知”模式，这使得它在处理海量并发连接（其中绝大多数是空闲连接）时，性能不会随连接数的增加而线性下降。
@@ -31,7 +31,7 @@ struct eventpoll {
 	- **作用**：通过 `epoll_ctl` 添加、删除或修改 FD 时，内核以 $O(\log N)$ 的复杂度操作该树。这避免了每次调用都要把所有 FD 拷贝到内核。
 
 > 比如当你调用 `epoll_ctl(..., ADD)` 时，内核会创建一个**包装了 FD** 的节点（`struct epitem`）并插入红黑树。
-	
+
 2. **就绪链表**
     - **存储内容**：已经**发生 I/O 事件**（如可读、可写）的 FD。
     - **作用**：设备中断最终触发协议栈处理，数据到达 socket 后唤醒其等待队列，而 epoll 在添加 fd 时已经在这个等待队列上注册了专属回调（`ep_poll_callback`），这个回调负责把 fd 加入就绪链表并唤醒 `epoll_wait`
@@ -206,10 +206,10 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
     struct epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = conn_fd;
-    
+
     // 调用后，内核已经把 ev 的内容存进了红黑树
-    epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &ev); 
-} 
+    epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &ev);
+}
 // 超出作用域，此时 ev 变量在栈上失效了，但没关系，内核红黑树里的配置依然有效。
 ```
 
@@ -234,13 +234,13 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 
 > [!note]
 > 传入的 `events` 数组本质是 `epoll_wait` 的**输出缓冲区**（就绪事件列表），**不是被监控 fd 的注册表**。
-> 
+>
 > ```
 > m_events 的本质：
-> 
+>
 > epoll_wait(epfd, m_events.data(), ...) 调用前：
 >   m_events = [垃圾值, 垃圾值, 垃圾值, ...]  ← 内容无意义
-> 
+>
 > epoll_wait 返回后：
 >   m_events = [就绪事件1, 就绪事件2, ...]    ← 内核覆盖写入
 >               |___n 个有效___|
@@ -368,10 +368,10 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 
 > **注**：写事件的本质是关注“发送能力的恢复”。
 
-> [!question] 
+> [!question]
 > 为什么 ET 模式必须使用**非阻塞 IO**？
 > - **逻辑链条**：ET 模式要求你必须使用 `while` 循环读/写直到“报错”（读完数据）。既然是循环，最后一次调用 `recv/send` 必然是因为**缓冲区没数据/没空间**了，**如果是阻塞 IO**，最后这一次调用会把整个主线程**永久卡死**，导致服务器失去响应。
-> 
+>
 > 因此，非阻塞 IO 是为了保证循环操作能通过 `EAGAIN` 安全退出。
 
 ## 4.3 触发模式示意图
@@ -434,7 +434,7 @@ int main() {
 
   // 创建服务器监听套接字
   ServerSocket server("127.0.0.1", 8080);
-  int listen_fd = server.getSockFd();
+  int server_fd = server.getSockFd();
 
   // 现在只有监听的文件描述符
   // 所有的文件描述符对应读写缓冲区状态都是委托内核进行检测的epoll
@@ -445,11 +445,11 @@ int main() {
     return 1;
   }
 
-  // 往 epoll 实例中添加需要检测的节点，现在只有 listen_fd
+  // 往 epoll 实例中添加需要检测的节点，现在只有 server_fd
   struct epoll_event event;
   event.events = EPOLLIN;  // 只检测可读事件
-  event.data.fd = listen_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &event) < 0) {
+  event.data.fd = server_fd;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) < 0) {
     Log_error("epoll_ctl error: errno=%d errmsg=%s", errno, strerror(errno));
     return 1;
   }
@@ -476,7 +476,7 @@ int main() {
       // events[i].events 就是就绪的事件类型
       int current_fd = events[i].data.fd;
       // 检查否有新连接
-      if (current_fd == listen_fd) {
+      if (current_fd == server_fd) {
         // 建立新的连接
         int conn_fd = server.accept();
         if (conn_fd < 0) {
@@ -544,9 +544,9 @@ int ready_counts = epoll_wait(epoll_fd, events.data(), events.size(), -1);
 struct epoll_event event;
 // 节点初始化
 event.events = EPOLLIN;     // 只检测可读事件
-event.data.fd = listen_fd;  //使用了联合体中 fd 成员
+event.data.fd = server_fd;  //使用了联合体中 fd 成员
 // 添加待检测节点到 epol1 实例中
-if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &event) < 0) { ... }
+if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) < 0) { ... }
 ```
 
 在添加节点的时候，需要对这个 `struct epoll_event` 类型的节点进行初始化，当这个节点对应的文件描述符变为已就绪状态，这些被传入的初始化信息就会被原样传出，这个对应关系必须要搞清楚。
@@ -592,120 +592,140 @@ ssize_t bytes_read = client_conn.recv(buffer, sizeof(buffer));
 
 ## 5.2 ET 模式
 
-这里把 `listen_fd` 设置为 LT 模式，`conn_fd` 设置为 ET 模式：
+这里把 `server_fd` 设置为 LT 模式，`conn_fd` 设置为 ET 模式：
 
 ```cpp
-/**
- * @File    :   src/server.cpp
- * @Time    :   2026/04/16 22:08:16
- * @Author  :   loskyertt
- * @Github  :   https://github.com/loskyertt
- * @Desc    :   epoll 示例（ET 模式，混用：listen_fd 为 LT；conn_fd 为 ET）
- */
-
-#include "logger/logger.h"
-#include "socket/server_socket.h"
-
 #include <sys/epoll.h>
-#include <array>
+#include <arpa/inet.h>
 #include <cstring>
-#include <print>
+#include <string>
+#include <array>
+#include <fcntl.h>
+#include <unistd.h>
 
-using namespace sky::utility;
-using namespace sky::socket;
+int main(int argc, char* argv[]) {
+  // 1. 创建 socket
+  const int server_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (server_fd < 0) {
+    printf("create socket error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
+  }
+  printf("socket create success!\n");
 
-int main() {
-  // 初始化日志
-  Singleton<Logger>::getInstance().open("log/server.log");
+  // 把 server_fd 设置为非阻塞模式（影响 accept）
+  int flag = fcntl(server_fd, F_GETFL, 0);
+  fcntl(server_fd, F_SETFL, flag | O_NONBLOCK);
 
-  // 创建服务器监听套接字
-  ServerSocket server("127.0.0.1", 8080);
-  int listen_fd = server.getSockFd();
+  // 2. 绑定 socket
+  const char* ip      = argv[1];
+  const uint16_t port = static_cast<uint16_t>(std::stoi(argv[2]));
 
-  // 现在只有监听的文件描述符
-  // 所有的文件描述符对应读写缓冲区状态都是委托内核进行检测的 epoll
+  sockaddr_in server_addr     = {};             // note：C++ 11 起的值初始化，默认初始化为 0
+  server_addr.sin_family      = AF_INET;        // 设置为 IPV4 的地址簇
+  server_addr.sin_addr.s_addr = inet_addr(ip);  // 地址转换：点分十进制 -> 32 位整数
+  server_addr.sin_port        = htons(port);    // 端口转换：主机字节序 -> 网络字节序
+
+  if (::bind(server_fd, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) < 0) {
+    printf("bind error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
+  }
+  printf("bind success!\n");
+
+  // 3. 监听
+  if (::listen(server_fd, 1024) < 0) {
+    printf("listen error: errno=%d, errmsg=%s\n", errno, strerror(errno));
+    return 1;
+  }
+  printf("server listening ...\n");
+
+  // === 以下是 epoll 部分 ===
+
   // 创建一个 epoll 模型
   int epoll_fd = epoll_create1(0);
   if (epoll_fd < 0) {
-    Log_error("epoll_create1 error: errno=%d errmsg=%s", errno, strerror(errno));
+    printf("epoll_create1 error: errno=%d errmsg=%s\n", errno, strerror(errno));
     return 1;
   }
 
-  // 往 epoll 实例中添加需要检测的节点，现在只有 listen_fd
-  struct epoll_event event;
-  event.events = EPOLLIN;  // 检测 listen_fd 读读缓冲区是否有数据
-  event.data.fd = listen_fd;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &event) < 0) {
-    Log_error("epoll_ctl error: errno=%d errmsg=%s", errno, strerror(errno));
+  // 往 epoll 实例中添加需要检测的节点，现在只有 server_fd
+  epoll_event event{};
+  event.events  = EPOLLIN;  // server_fd 设置为 LT 模式
+  event.data.fd = server_fd;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) < 0) {
+    printf("epoll_ctl error: errno=%d errmsg=%s\n", errno, strerror(errno));
     return 1;
   }
 
-  std::array<epoll_event, 1024> events;
+  std::array<epoll_event, 1024> events{};  // 就绪列表
 
   // 主事件循环
   while (true) {
     int ready_counts = epoll_wait(epoll_fd, events.data(), events.size(), -1);
-    // 内核会向 events[0] 到 events[ready_counts-1] 写入有效数据
-    // events[ready_counts] 到 events[1023] 保持不变（不会被访问）
+    // 内核会向 events[0] 到 events[ready_counts-1] 写入有效数据；
+    // events[ready_counts] 到 events[1023] 保持不变（不会被访问）。
     if (ready_counts < 0) {
-      Log_error("epoll_wait error: errno=%d errmsg=%s", errno, strerror(errno));
+      printf("epoll_wait error: errno=%d errmsg=%s\n", errno, strerror(errno));
       return 1;
-    } else if (ready_counts == 0) {
-      Log_debug("epoll_wait timeout...");
+    }
+    if (ready_counts == 0) {
+      printf("epoll_wait timeout...\n");
       continue;
     }
-    Log_debug("epoll_wait ok: ready_count=%d", ready_counts);
+    printf("epoll_wait ok: ready_count=%d\n", ready_counts);
 
     // 处理就绪事件
     for (int i = 0; i < ready_counts; ++i) {
-      // events[i].data.fd 就是就绪的文件描述符；events[i].events 就是就绪的事件类型
+      // events[i].data.fd 是已就绪的文件描述符
+      // events[i].events 是已就绪的事件类型
       int current_fd = events[i].data.fd;
       // 检查否有新连接
-      if (current_fd == listen_fd) {
+      if (current_fd == server_fd) {
         // 建立新的连接
-        int conn_fd = server.accept();
-        if (conn_fd < 0) {
-          continue;
-        }
-        Log_debug("new connection: fd=%d", conn_fd);
+        int conn_fd = ::accept(server_fd, nullptr, nullptr);
+        if (conn_fd >= 0) {
+          printf("New client connected: conn_fd=%d\n", conn_fd);
 
-        // 新得到的件描述符添加到 epol1 模型中，下轮循环的时候就可以被检测了
-        event.events = EPOLLIN | EPOLLET;  // 设置边沿模式
-        event.data.fd = conn_fd;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &event) < 0) {
-          Log_error("epoll_ctl error: errno=%d errmsg=%s", errno, strerror(errno));
-          continue;
+          // 把 conn_fd 设为非阻塞模式（影响 recv 和 send）
+          flag = fcntl(conn_fd, F_GETFL, 0);
+          fcntl(conn_fd, F_SETFL, flag | O_NONBLOCK);
+
+          // 新得到的文件描述符添加到 epoll 模型中，下轮循环的时候就可以被检测了
+          event.events  = EPOLLIN | EPOLLET;  // conn_fd 设置为 ET 模式
+          event.data.fd = conn_fd;
+          if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &event) < 0) {
+            printf("epoll_ctl error: errno=%d errmsg=%s\n", errno, strerror(errno));
+            ::close(conn_fd);
+          }
         }
-      } else {
-        Socket client_conn(current_fd);
-        client_conn.setNonBlocking();  // 设置为非阻塞
-        client_conn.setRelease();      // 释放所有权，析构函数不再 close(fd)
+      }
+      else {
+        printf("Client data available on fd=%d\n", current_fd);
 
         char buf[5] = {0};  // 这里故意设置一个小缓冲区，当接收的数据超过这个缓冲区的大小，后面会循环读完剩下的数据
-        std::string all_data;
+        std::string message;
         while (true) {
-          ssize_t bytes_read = client_conn.recv(buf, sizeof(buf));
-
-          if (bytes_read == 0) {
-            // 客户端关闭连接
-            Log_info("Client disconnected: fd=%d", current_fd);
-            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, nullptr);
-            client_conn.close();  // 手动关闭
-            break;
-          } else if (bytes_read > 0) {
-            std::println("Received {} bytes from fd={}, data={}", bytes_read, current_fd, std::string(buf, bytes_read));
-            all_data += std::string(buf, bytes_read);
-          } else {
-            // 数据读完了
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-              // 向客户端发送数据
-              std::string new_data = "Echo " + all_data;
-              client_conn.send(new_data.c_str(), new_data.size());
-              break;  // 非阻塞模式正常情况
+          ssize_t bytes_read = ::recv(current_fd, buf, sizeof(buf), 0);
+          if (bytes_read > 0) {
+            printf("Received %ld bytes from fd=%d, data=%s\n", bytes_read, current_fd, buf);
+            // 向客户端发送数据
+            message += std::string(buf, bytes_read);
+          }
+          else {
+            if (bytes_read == 0) {
+              // 客户端关闭连接
+              printf("Client disconnected: fd=%d\n", current_fd);
             }
-            Log_error("recv error: errno=%d errmsg=%s", errno, strerror(errno));
+            else {
+              // 数据读完了
+              if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 向客户端发送数据
+                ::send(current_fd, message.c_str(), message.size(), 0);
+                break;
+              }
+              printf("recv error: errno=%d errmsg=%s\n", errno, strerror(errno));
+            }
             epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, nullptr);
-            client_conn.close();  // 手动关闭
+            ::close(current_fd);  // 手动关闭
             break;
           }
         }
@@ -713,16 +733,15 @@ int main() {
     }
   }
 
-  if (epoll_fd >= 0) {
-    ::close(epoll_fd);
-  }
+  ::close(epoll_fd);
+  ::close(server_fd);
 
   return 0;
 }
 ```
 
 > [!exampel] 数据流
-> 
+>
 > ```
 > 客户端发送 "hello world"
 >     ↓
@@ -740,11 +759,11 @@ int main() {
 epoll 的触发模式是**针对每个 fd 单独设置**的，存在 `epoll_event.events` 里，不是 epoll 实例的全局配置。所以同一个 epoll 实例里，可以为不同 fd 设置不同模式：
 
 ```c
-// listen_fd 用 LT，有新连接就通知，取完再说
+// server_fd 用 LT，有新连接就通知，取完再说
 struct epoll_event ev;
 ev.events  = EPOLLIN;            // 不加 EPOLLET → LT
-ev.data.fd = listen_fd;
-epoll_ctl(epfd, EPOLL_CTL_ADD, listen_fd, &ev);
+ev.data.fd = server_fd;
+epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &ev);
 
 // conn_fd 用 ET，数据必须一次读完
 ev.events  = EPOLLIN | EPOLLET;  // 加 EPOLLET → ET
@@ -752,11 +771,11 @@ ev.data.fd = conn_fd;
 epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &ev);
 ```
 
-这里我把 `listen_fd` 设置为 LT 模式，`conn_fd` 设置为 ET 模式，两种 fd 的职责刚好匹配各自的模式：
-- **listen_fd（LT）**：全连接队列有几个连接，`epoll_wait` 就返回几次，每次只 `accept` 一个，简单安全，**不会有漏连接的风险**。
+这里把 `server_fd` 设置为 LT 模式，`conn_fd` 设置为 ET 模式，两种 fd 的职责刚好匹配各自的模式：
+- **server_fd（LT）**：全连接队列有几个连接，`epoll_wait` 就返回几次，每次只 `accept` 一个，简单安全，**不会有漏连接的风险**。
 - **conn_fd（ET）**：数据到达时只通知一次，然后用 `while` 循环读到 EAGAIN，一次处理完所有数据。这样可以减少 `epoll_wait` 的唤醒次数，高并发下更高效。
 
-如果把 `listen_fd` 设置为 ET 模式，需要进行循环 `accept()`：
+如果把 `server_fd` 设置为 ET 模式，需要进行循环 `accept()`：
 
 ```cpp
 while (true) {
@@ -772,7 +791,7 @@ while (true) {
 }
 ```
 
-`listen_fd` 在 ET 模式要用 `while` 循环的原因：
+`server_fd` 在 ET 模式要用 `while` 循环的原因：
 
 ```
 队列状态：[ conn1 | conn2 | conn3 ]
@@ -794,35 +813,35 @@ while (true) {
   回到 epoll_wait，安全
 ```
 
-下面是 `listen_fd` 在不同模式下处理多个连接同时到达的场景模拟：
+下面是 `server_fd` 在不同模式下处理多个连接同时到达的场景模拟：
 
 ```
 // 场景：3 个客户端几乎同时连接
 // 内核连接队列：[conn1, conn2, conn3]
 
 // LT 模式：
-epoll_wait() -> 返回 listen_fd
+epoll_wait() -> 返回 server_fd
 accept() -> 取出 conn1 -> 返回 conn_fd1
-epoll_wait() -> 再次返回 listen_fd（因为还有 conn2, conn3）
+epoll_wait() -> 再次返回 server_fd（因为还有 conn2, conn3）
 accept() -> 取出 conn2 -> 返回 conn_fd2
-epoll_wait() -> 再次返回 listen_fd（因为还有 conn3）
+epoll_wait() -> 再次返回 server_fd（因为还有 conn3）
 accept() -> 取出 conn3 -> 返回 conn_fd3
 
 // ET 模式：
-epoll_wait() -> 返回 listen_fd（状态变化：listen_fd 指向的全连接队列“从空变非空”，触发且仅触发这一次）
+epoll_wait() -> 返回 server_fd（状态变化：server_fd 指向的全连接队列“从空变非空”，触发且仅触发这一次）
 accept() -> 取出 conn1 -> 返回 conn_fd1
 accept() -> 取出 conn2 -> 返回 conn_fd2 // 继续取，直到队列为空
 accept() -> 取出 conn3 -> 返回 conn_fd3
 accept() -> 返回 -1, errno=EAGAIN  // 队列空了，停止
 ```
 
-这里说的返回 `epoll_wait() -> 返回 listen_fd`，不是通过返回值来返回得到的，而是通过传入的 `events` 数组，别弄混了。
+这里说的返回 `epoll_wait() -> 返回 server_fd`，不是通过返回值来返回得到的，而是通过传入的 `events` 数组，别弄混了。
 
 > [!note]
-> 设置 `listen_fd` 为 LT 模式的好处不只是省掉 `while` 循环，更重要的是**安全**：
-> - `listen_fd` 的全连接队列在极端情况下可能瞬间涌入大量连接，LT 模式下可以保证即使某次循环只处理了一个（只要全连接队列里的内容不为空），下次 `epoll_wait` 还会继续提醒你进行处理，**不会丢连接**。
-> - LT 模式对 `listen_fd` 的额外开销可忽略不计——一般情况下**连接建立的频率远低于数据读写**，额外的 `epoll_wait` 唤醒次数几乎不影响整体性能。
-> 
+> 设置 `server_fd` 为 LT 模式的好处不只是省掉 `while` 循环，更重要的是**安全**：
+> - `server_fd` 的全连接队列在极端情况下可能瞬间涌入大量连接，LT 模式下可以保证即使某次循环只处理了一个（只要全连接队列里的内容不为空），下次 `epoll_wait` 还会继续提醒你进行处理，**不会丢连接**。
+> - LT 模式对 `server_fd` 的额外开销可忽略不计——一般情况下**连接建立的频率远低于数据读写**，额外的 `epoll_wait` 唤醒次数几乎不影响整体性能。
+>
 > `conn_fd` 承载高频数据读写事件，ET 模式的收益体现在：
 > - 减少 `epoll_wait` 的无效唤醒次数（数据未读完时 LT 会持续触发）；
 > - 在高并发读写场景下降低系统调用频率，提升整体吞吐量。
@@ -831,7 +850,7 @@ accept() -> 返回 -1, errno=EAGAIN  // 队列空了，停止
 |:---|:---|:---|:---|:---|
 | **全 LT** | 低 | 高 | 一般 | 通用服务、快速开发、连接数适中 |
 | **全 ET** | 高 | 依赖编码严谨性 | 高 | 极高并发、吞吐量敏感型服务 |
-| **LT（listen_fd）+ ET（conn_fd）** | 中 | 较高 | 较高 | 兼顾连接安全与数据 I/O 性能 |
+| **LT（server_fd）+ ET（conn_fd）** | 中 | 较高 | 较高 | 兼顾连接安全与数据 I/O 性能 |
 
 ---
 
@@ -846,19 +865,19 @@ ssize_t n = read(fd, buf, sizeof(buf));
 
 if (n > 0) {
     // 正常处理
-} 
+}
 else if (n == 0) {
     // 对端关闭（如果是 select 或 poll，替换成对应的关闭方式）
     epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
     close(fd);
-} 
+}
 else {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
         // 正常情况：数据读完
-    } 
+    }
     else if (errno == EINTR) {
         // 被信号中断，可重试
-    } 
+    }
     else {
         // 真正错误（如果是 select 或 poll，替换成对应的关闭方式）
         epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
