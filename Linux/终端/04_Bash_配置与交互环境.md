@@ -608,6 +608,13 @@ alias l='ls -CF'
 alias lh='ls -lhS'                  # 按文件大小排序
 alias lt='ls -lhtr'                 # 按修改时间排序（最新在底部）
 
+# 如果支持 eza
+#alias ll='eza -alh --git --icons'
+#alias la='eza -a --icons'
+#alias l='eza --icons'
+#alias lh='eza -lhS --icons'  # 按文件大小排序
+#alias lt='eza -lh --sort=modified --icons --time-style=long-iso --time=modified'  # 按修改时间排序（最新在底部）
+
 # 导航
 alias ..='cd ..'
 alias ...='cd ../..'
@@ -837,7 +844,7 @@ dstop-all() {
 }
 
 # 解压：支持常见格式
-ex() {
+extract() {
     local file="$1"
 
     if [[ -z "$file" ]]; then
