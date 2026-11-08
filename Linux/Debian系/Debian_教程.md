@@ -557,12 +557,7 @@ sudo apt install ./code_1.106.2_amd64.deb
 
 ### 8.3.4 dpkg 与 APT 的互通性
 
-> [!question]
-> 通过 `dpkg -i` 安装的软件包，可以用 `apt` 卸载吗？
-
-**结论**：==可以==。无论软件包是通过 `dpkg -i` 还是 `apt install` 安装的，最终都会登记到同一个 dpkg 数据库中，APT 在卸载时读取的就是这个数据库。
-
-#### 原理：dpkg 数据库是唯一真相源
+通过 `dpkg -i` 安装的软件包，可以用 `apt` 卸载。无论软件包是通过 `dpkg -i` 还是 `apt install` 安装的，最终都会登记到同一个 dpkg 数据库中，APT 在卸载时读取的就是这个数据库。
 
 Debian 系统中所有已安装的软件包信息都记录在 `/var/lib/dpkg/status` 文件中，这个文件被称为 **dpkg 数据库**。所有包管理工具都围绕它工作：
 
@@ -575,14 +570,12 @@ graph LR
     F[dpkg -r xxx] --> D
 ```
 
-关键事实：
-
 - `apt install` 内部本身就是调用 `dpkg -i` 完成安装。
 - `apt remove` 内部调用的是 `dpkg -r`。
 - 三者（dpkg、apt、apt-get）共享同一个 dpkg 数据库。
 - ==包的安装来源对卸载流程完全透明==。
 
-#### 完整示例：以 VS Code 安装与卸载为例
+> [!example] 下面以 VS Code 安装与卸载为例。
 
 假设从官网下载了 VS Code 的 `.deb` 安装包，先用 dpkg 安装：
 
@@ -631,9 +624,8 @@ sudo dpkg -P code
 sudo apt-get remove code
 ```
 
-五种命令最终都调用 `dpkg -r` 或 `dpkg -P`，效果完全一致。
-
-#### 一个小差异：自动/手动安装标记
+> [!note]
+> `purge` 参数清除的配置文件一般是 /etc 目录下的全局配置，用户级配置是不会被删除的。
 
 虽然卸载没有差异，但 `apt autoremove` 的行为会因安装方式不同而有所区别：
 
@@ -838,56 +830,109 @@ apt-mark showmanual
 > [!warning]
 > 版本锁定仅阻止 `apt upgrade` 自动升级，==不能阻止显式的 `apt install pkg=newver`==。锁定系统基础包（如 `glibc`、`systemd`）可能导致后续升级链断裂，普通学习环境不建议随意锁定。
 
-## 8.6 aptitude
+## 8.6 更新
 
-`aptitude` 是 APT 的另一个前端，提供**全屏文本界面（TUI）**和更激进的依赖求解算法。
+### 8.6.1 update
 
-### 8.6.1 aptitude 的特点
+```bash
+sudo apt update
+```
 
-| 特点 | 说明 |
+该作用是更新本地的软件包索引（package index），它**不会安装或更新任何软件**，它会访问 `/etc/apt/sources.list` 和 `/etc/apt/sources.list.d/` 中配置的软件源，连接远程软件仓库下载最新的软件包列表索引。
+
+例如：
+
+```
+Debian仓库：
+    bash 5.2.15
+    vim 9.0
+    gcc 12
+
+        ↓ apt update
+
+本地缓存：
+    bash 5.2.15
+    vim 9.0
+    gcc 12
+```
+
+---
+
+### 8.6.2 upgrade
+
+```bash
+sudo apt upgrade
+```
+
+- **作用**：它会对比本地已经安装的软件版本和刚刚通过 `update` 获取的最新软件列表。如果发现有新版本，它就会下载并安装这些更新。
+- **特点**：它是“保守”的。它只会升级现有的软件，**不会为了升级而卸载其他软件**。如果有某个软件的更新需要卸载某个现有的包，`upgrade` 会跳过这个软件的更新，以保持系统稳定。
+
+> [!example] 
+> 
+> ```
+> old package:
+>     linux-image-6.1
+> 
+> new package:
+>     linux-image-6.5
+> 
+> 需要删除旧包才能升级
+> ```
+> 
+> 这种情况 `upgrade` 可能跳过。
+
+查看可更新的软件包：
+
+```bash
+apt list --upgradable
+```
+
+### 8.6.3 full-upgrade
+
+```bash
+sudo apt update
+sudo apt full-upgrade
+```
+
+旧版本叫：
+
+```bash
+sudo apt dist-upgrade
+```
+
+作用：
+- 安装新依赖
+- 删除冲突包
+- 替换软件包
+
+例如内核升级：
+
+```
+linux-image-6.1
+        ↓
+linux-image-6.10
+
+需要安装新的内核包
+```
+
+`full-upgrade` 会处理。
+
+### 8.6.4 更新后清理
+
+```bash
+sudo apt autoremove
+sudo apt autoclean
+```
+
+解释：
+
+|命令|作用|
 |---|---|
-| TUI 界面 | 提供 `ncurses` 全屏交互界面，可浏览、选择、安装包 |
-| 依赖求解 | 在冲突场景下尝试更多组合方案，比 `apt` 更激进 |
-| 自动推荐 | 自动建议安装 Recommends 包 |
-| 历史包袱 | 早期是 Debian 安装器默认前端，现已不是必需 |
+|`autoremove`|删除不再需要的依赖|
+|`autoclean`|删除缓存中已经不存在的软件包|
+|`clean`|删除全部 apt 缓存|
 
-### 8.6.2 命令行用法
-
-`aptitude` 既支持 TUI，也支持与 `apt` 类似的命令行用法：
-
-```bash
-# 进入 TUI 全屏界面
-sudo aptitude
-
-# 命令行安装
-sudo aptitude install git
-
-# 命令行搜索
-aptitude search nginx
-
-# 查看包详情
-aptitude show cmake
-
-# 升级系统
-sudo aptitude safe-upgrade
-
-# 完整升级（允许卸载冲突包）
-sudo aptitude full-upgrade
-```
-
-### 8.6.3 何时使用 aptitude
-
-> [!tip]
-> 现代 Debian 日常使用**不必安装 aptitude**。它的主要价值在于：
-> - 复杂依赖冲突时提供多种解决方案
-> - 喜欢文本界面浏览软件包的用户
-> - 旧版 Debian 文档与教程的兼容
-
-安装 aptitude：
-
-```bash
-sudo apt install aptitude
-```
+---
 
 ## 8.7 常见易错点
 
@@ -922,17 +967,3 @@ sudo apt install aptitude
    - 锁定仅阻止自动升级，显式指定版本仍可安装。
    - 维护脚本应同时检查 `apt-mark showhold` 输出。
 
-## 8.8 工具选型总结
-
-> [!summary]
-> Debian 包管理工具的选型决策：
-
-| 场景 | 推荐工具 | 推荐命令 |
-|---|---|---|
-| 日常安装、卸载、升级 | APT 前端 | `apt install` / `apt remove` |
-| 脚本、Dockerfile、CI | APT 前端 | `apt-get install -y` |
-| 查询软件包信息 | APT 查询前端 | `apt show` / `apt-cache policy` |
-| 查询文件归属、本地状态 | dpkg | `dpkg -S` / `dpkg -L` / `dpkg -l` |
-| 离线安装 `.deb` | APT 前端 | `apt install ./xxx.deb` |
-| 版本锁定、状态标记 | apt-mark | `apt-mark hold` / `showhold` |
-| 复杂依赖冲突求解 | aptitude | `aptitude install` |
