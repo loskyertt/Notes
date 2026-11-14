@@ -43,3 +43,6 @@ __pycache__/
 # Log and temp directories
 log/
 tmp/
+
+# Editor sync cache (Obsidian plugin version snapshots)
+.solomd-sync/
