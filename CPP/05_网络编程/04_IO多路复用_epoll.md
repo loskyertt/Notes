@@ -423,7 +423,7 @@ graph TD
 #include <sys/epoll.h>
 #include <array>
 #include <cstring>
-#include <print>
+#include <cstdio>
 
 using namespace sky::utility;
 using namespace sky::socket;
@@ -505,7 +505,7 @@ int main() {
           epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, nullptr);
           client_conn.close();  // 手动关闭
         } else if (bytes_read > 0) {
-          std::println("Received {} bytes from fd={}, data={}", bytes_read, current_fd, std::string(buf));
+          printf("Received %zd bytes from fd=%d, data=%s\n", bytes_read, current_fd, buf);
 
           // 向客户端发送数据
           std::string new_data = "Echo: " + std::string(buf, bytes_read);
